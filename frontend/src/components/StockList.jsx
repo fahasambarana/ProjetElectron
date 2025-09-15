@@ -3,9 +3,21 @@ import { useNavigate } from "react-router-dom";
 import api from "../services/api";
 import DeleteConfirmationModal from "../components/DeleteConfirmationModal";
 import AddStockForm from "../components/AddStockForm";
+import UpdateStockForm from "./UpdateStockForm";
+import { 
+  Plus, 
+  Search, 
+  AlertCircle, 
+  Package, 
+  Edit, 
+  Trash2,
+  RotateCw,
+  Box
+} from "lucide-react";
 
 const StockList = () => {
   const [search, setSearch] = useState("");
+  const [selectedStock, setSelectedStock] = useState(null);
   const [stocks, setStocks] = useState([]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -13,12 +25,12 @@ const StockList = () => {
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const navigate = useNavigate();
 
+  // Récupération des stocks
   const fetchStocks = async () => {
     try {
       const res = await api.get("/stocks");
       setStocks(res.data);
     } catch (err) {
-      console.error(err);
       setError("Impossible de charger les stocks");
     } finally {
       setLoading(false);
@@ -29,11 +41,16 @@ const StockList = () => {
     fetchStocks();
   }, []);
 
+  // Ouvrir modale ajout
   const handleAddClick = () => setShowAddModal(true);
-  const handleEditClick = (stock) =>
-    navigate(`/editstock/${stock._id}`, { state: { stock } });
+
+  // Ouvrir modale édition
+  const handleEditClick = (stock) => setSelectedStock(stock);
+
+  // Ouvrir modale suppression
   const handleDeleteClick = (stockId) => setDeleteConfirm(stockId);
 
+  // Confirmer suppression
   const confirmDelete = async (stockId) => {
     try {
       console.log("Suppression stockId :", stockId);
@@ -46,185 +63,220 @@ const StockList = () => {
     }
   };
 
+  // Annuler suppression
   const cancelDelete = () => setDeleteConfirm(null);
 
-  // Filtre à placer avant le return
-  const filteredStocks = stocks.filter(item =>
+  // Filtrage par recherche
+  const filteredStocks = stocks.filter((item) =>
     item.name.toLowerCase().includes(search.toLowerCase())
   );
 
   return (
-    <div className="max-w-6xl mx-auto bg-white p-8 rounded-2xl shadow-lg border border-gray-100">
+    <div className="max-w-6xl mx-auto bg-white p-8 rounded-xl shadow-sm border border-gray-200">
+      {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
         <div>
-          <h2 className="text-3xl font-bold text-gray-800">
+          <h2 className="text-2xl font-semibold text-gray-800">
             Gestion des Stocks
           </h2>
-          <p className="text-gray-500 mt-2">
+          <p className="text-gray-500 mt-1 text-sm">
             Suivez et gérez vos niveaux de stock
           </p>
         </div>
         <button
           onClick={handleAddClick}
-          className="px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl hover:from-indigo-700 hover:to-purple-700 transition-all duration-300 shadow-md hover:shadow-lg flex items-center gap-2"
+          className="px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200 shadow-sm hover:shadow-md flex items-center gap-2 text-sm font-medium"
         >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            className="h-5 w-5"
-            viewBox="0 0 20 20"
-            fill="currentColor"
-          >
-            <path
-              fillRule="evenodd"
-              d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z"
-              clipRule="evenodd"
-            />
-          </svg>
-          Ajouter un nouveau stock
+          <Plus className="h-4 w-4" />
+          Nouveau stock
         </button>
       </div>
 
+      {/* Barre recherche + stats */}
+      <div className="bg-gray-50 p-4 rounded-lg mb-6 flex flex-col sm:flex-row justify-between items-center gap-4">
+        <div className="relative w-full sm:w-64">
+          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <Search className="h-5 w-5 text-gray-400" />
+          </div>
+          <input
+            type="text"
+            placeholder="Rechercher un produit…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg leading-5 bg-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+          />
+        </div>
+
+        <div className="flex items-center gap-4 text-sm">
+          <span className="text-gray-600">
+            {filteredStocks.length} produits
+          </span>
+          <span className="flex items-center">
+            <span className="h-2 w-2 rounded-full bg-green-400 mr-1"></span>
+            <span className="text-gray-600">
+              {stocks.filter((item) => item.stock > item.threshold).length} en
+              stock
+            </span>
+          </span>
+          <span className="flex items-center">
+            <span className="h-2 w-2 rounded-full bg-amber-400 mr-1"></span>
+            <span className="text-gray-600">
+              {
+                stocks.filter(
+                  (item) => item.stock <= item.threshold && item.stock > 0
+                ).length
+              }{" "}
+              stock faible
+            </span>
+          </span>
+        </div>
+      </div>
+
+      {/* Liste */}
       {loading ? (
         <div className="flex flex-col justify-center items-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-600 mb-4"></div>
-          <p className="text-gray-500">Chargement des stocks...</p>
+          <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-blue-600 mb-4"></div>
+          <p className="text-gray-500 text-sm">Chargement des stocks...</p>
         </div>
       ) : error ? (
-        <div className="bg-red-50 p-6 rounded-xl border border-red-200 text-center">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            className="h-10 w-10 text-red-500 mx-auto mb-3"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-            />
-          </svg>
-          <p className="text-red-500 font-medium">{error}</p>
+        <div className="bg-red-50 p-5 rounded-lg border border-red-200 text-center">
+          <AlertCircle className="h-8 w-8 text-red-500 mx-auto mb-3" />
+          <p className="text-red-500 font-medium text-sm">{error}</p>
           <button
             onClick={fetchStocks}
-            className="mt-4 px-4 py-2 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-colors"
+            className="mt-4 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm flex items-center gap-2 mx-auto"
           >
+            <RotateCw className="h-4 w-4" />
             Réessayer
           </button>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-2xl shadow-lg border border-gray-100">
-          <div className="mb-6">
-            <input
-              type="text"
-              placeholder="Rechercher un produit…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full px-4 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-indigo-400"
-            />
-          </div>
-          <table className="w-full">
-            <thead>
-              <tr className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white">
-                <th className="px-6 py-4 font-semibold text-left">Produit</th>
-                <th className="px-6 py-4 font-semibold text-left">Stock</th>
-                <th className="px-6 py-4 font-semibold text-left">Seuil Min</th>
-                <th className="px-6 py-4 font-semibold text-center">Actions</th>
+        <div className="overflow-hidden rounded-lg border border-gray-200 shadow-sm">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Produit
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Stock
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Seuil Min
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Statut
+                </th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Actions
+                </th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="bg-white divide-y divide-gray-200">
               {filteredStocks.length === 0 ? (
                 <tr>
-                  <td colSpan="4" className="text-center py-8 text-gray-500">
-                    Aucun stock disponible.
+                  <td
+                    colSpan="5"
+                    className="px-6 py-8 text-center text-sm text-gray-500"
+                  >
+                    <Box className="mx-auto h-12 w-12 text-gray-400" />
+                    <p className="mt-4">Aucun stock trouvé.</p>
                   </td>
                 </tr>
               ) : (
-                filteredStocks.map((item) => (
-                  <tr
-                    key={item._id}
-                    className="hover:bg-indigo-50 transition-colors duration-200 border-b border-gray-100 last:border-b-0"
-                  >
-                    <td className="px-6 py-4 font-medium text-gray-800">
-                      {item.name}
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2">
-                        {item.stock}
-                        {item.stock <= item.threshold && (
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            className="h-4 w-4 text-amber-500"
-                            viewBox="0 0 20 20"
-                            fill="currentColor"
-                          >
-                            <path
-                              fillRule="evenodd"
-                              d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
-                              clipRule="evenodd"
-                            />
-                          </svg>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">{item.threshold}</td>
-                    <td className="px-6 py-4">
-                      <div className="flex justify-center space-x-2">
-                        <button
-                          onClick={() => handleEditClick(item)}
-                          className="p-2 bg-blue-100 text-blue-600 rounded-lg hover:bg-blue-200 transition-colors"
-                          title="Modifier"
+                filteredStocks.map((item) => {
+                  const status =
+                    item.stock === 0
+                      ? { text: "Rupture", color: "bg-red-100 text-red-800" }
+                      : item.stock <= item.threshold
+                      ? {
+                          text: "Stock faible",
+                          color: "bg-amber-100 text-amber-800",
+                        }
+                      : {
+                          text: "En stock",
+                          color: "bg-green-100 text-green-800",
+                        };
+
+                  return (
+                    <tr
+                      key={item._id}
+                      className="hover:bg-gray-50 transition-colors duration-150"
+                    >
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <div className="h-10 w-10 flex-shrink-0 bg-blue-100 rounded-lg flex items-center justify-center">
+                            <Package className="h-5 w-5 text-blue-600" />
+                          </div>
+                          <div className="ml-4">
+                            <div className="text-sm font-medium text-gray-900">
+                              {item.name}
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">
+                          {item.stock} unités
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {item.threshold} unités
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span
+                          className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${status.color}`}
                         >
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            className="h-5 w-5"
-                            viewBox="0 0 20 20"
-                            fill="currentColor"
+                          {status.text}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <div className="flex justify-end space-x-2">
+                          <button
+                            onClick={() => handleEditClick(item)}
+                            className="text-blue-600 hover:text-blue-900 transition-colors duration-150"
+                            title="Modifier"
                           >
-                            <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-                          </svg>
-                        </button>
-                        <button
-                          onClick={() => handleDeleteClick(item._id)}
-                          className="p-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-colors"
-                          title="Supprimer"
-                        >
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            className="h-5 w-5"
-                            viewBox="0 0 20 20"
-                            fill="currentColor"
+                            <Edit className="h-5 w-5" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteClick(item._id)}
+                            className="text-red-600 hover:text-red-900 transition-colors duration-150"
+                            title="Supprimer"
                           >
-                            <path
-                              fillRule="evenodd"
-                              d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z"
-                              clipRule="evenodd"
-                            />
-                          </svg>
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
+                            <Trash2 className="h-5 w-5" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
         </div>
       )}
 
-      {/* Modale d'ajout de stock */}
+      {/* Modale d'ajout */}
       <AddStockForm
         isOpen={showAddModal}
         onClose={() => setShowAddModal(false)}
         onStockAdded={fetchStocks}
       />
 
-      {/* Modale de confirmation de suppression */}
+      {/* Modale de confirmation suppression */}
       <DeleteConfirmationModal
         isOpen={deleteConfirm !== null}
         onCancel={cancelDelete}
         onConfirm={() => confirmDelete(deleteConfirm)}
+      />
+
+      {/* Modale mise à jour */}
+      <UpdateStockForm
+        isOpen={!!selectedStock}
+        onClose={() => setSelectedStock(null)}
+        stockId={selectedStock?._id}
+        onStockUpdated={fetchStocks}
       />
     </div>
   );
