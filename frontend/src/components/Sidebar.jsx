@@ -31,6 +31,7 @@ const Sidebar = () => {
     { to: "/stocklist", label: "Liste des Stocks", icon: BarChart3 },
     { to: "/notifications", label: "Notifications", icon: Bell },
     { to: "/edt", label: "Emploi du temps", icon: Calendar },
+    { to: "/emprunt", label: "Emprunts", icon: Calendar },
   ];
   const navigate = useNavigate()
   const logout =() =>{

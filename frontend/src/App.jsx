@@ -15,6 +15,7 @@ import StockList from "./components/StockList"; // ✅ Import du StockList
 import AddStockForm from "./components/AddStockForm"; // ✅ Import du AddStockForm
 import UpdateStockForm from "./components/UpdateStockForm";
 import { useAuth, AuthProvider } from "./context/useContext"; // Vérifie que ce chemin est correct
+import ListeEmprunts from "./components/ListeEmprunt"; // ✅ Import du ListeEmprunt
 
 const PrivateRoute = ({ children }) => {
   const { user } = useAuth();
@@ -69,7 +70,8 @@ function App() {
                 </Layout>
               </PrivateRoute>
             }
-          /> <Route
+          />{" "}
+          <Route
             path="/edt"
             element={
               <PrivateRoute>
@@ -78,7 +80,18 @@ function App() {
                 </Layout>
               </PrivateRoute>
             }
-          /><Route
+          />{""}
+          <Route
+            path="/emprunt"
+            element={
+              <PrivateRoute>
+                <Layout>
+                  <ListeEmprunts />
+                </Layout>
+              </PrivateRoute>
+            }
+          />
+          <Route
             path="/editstock/:id"
             element={
               <PrivateRoute>

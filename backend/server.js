@@ -4,6 +4,7 @@ const dotenv = require('dotenv');
 const connectDB = require('./config/database');
 const stockRoute = require('./routes/stockRoute');
 const eventRoutes = require('./routes/eventRoutes')
+const empruntRoutes = require('./routes/empruntRoutes');
 
 
 
@@ -22,6 +23,7 @@ connectDB(MONGO_URI);
 
 app.use('/api/stocks', stockRoute);
 app.use("/api/events", eventRoutes);
+app.use("/api/emprunts", empruntRoutes);
 
 
 app.get('/', (req, res) => res.send('API stocks fonctionne'));

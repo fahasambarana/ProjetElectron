@@ -4,6 +4,7 @@ import { format, startOfWeek, addDays } from "date-fns";
 import { fr } from "date-fns/locale";
 import EditModal from "./EditEdtModal";
 import { useNavigate } from "react-router-dom";
+import api from "../services/api";
 
 export default function ListeEDT() {
   const navigate = useNavigate();
@@ -23,7 +24,7 @@ export default function ListeEDT() {
   const fetchEvents = async () => {
     try {
       setIsLoading(true);
-      const res = await axios.get("http://localhost:5000/api/events");
+      const res = await api.get("/events");
       setEvents(res.data);
 
       // Extraire les valeurs uniques pour les filtres

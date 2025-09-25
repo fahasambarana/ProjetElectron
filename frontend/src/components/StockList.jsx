@@ -4,15 +4,19 @@ import api from "../services/api";
 import DeleteConfirmationModal from "../components/DeleteConfirmationModal";
 import AddStockForm from "../components/AddStockForm";
 import UpdateStockForm from "./UpdateStockForm";
-import { 
-  Plus, 
-  Search, 
-  AlertCircle, 
-  Package, 
-  Edit, 
+import jsPDF  from "jspdf";
+import "jspdf-autotable";
+
+import {
+  Plus,
+  Search,
+  AlertCircle,
+  Package,
+  Edit,
   Trash2,
   RotateCw,
-  Box
+  Box,
+  Download,
 } from "lucide-react";
 
 const StockList = () => {
@@ -23,9 +27,9 @@ const StockList = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [exporting, setExporting] = useState(false);
   const navigate = useNavigate();
 
-  // Récupération des stocks
   const fetchStocks = async () => {
     try {
       const res = await api.get("/stocks");
@@ -41,29 +45,224 @@ const StockList = () => {
     fetchStocks();
   }, []);
 
-  // Ouvrir modale ajout
+  const exportToPDF = () => {
+    setExporting(true);
+
+    try {
+      // Créer une nouvelle instance de jsPDF
+      const doc = new jsPDF();
+
+      // Titre principal
+      doc.setFontSize(18);
+      doc.setTextColor(40, 40, 40);
+      doc.text("LISTE DES STOCKS", 105, 15, { align: "center" });
+
+      // Date d'export
+      doc.setFontSize(10);
+      doc.setTextColor(100, 100, 100);
+      doc.text(`Export du ${new Date().toLocaleDateString("fr-FR")}`, 105, 22, {
+        align: "center",
+      });
+
+      // Statistiques
+      doc.setFontSize(9);
+      doc.text(
+        `Total: ${filteredStocks.length} produits | ` +
+          `En stock: ${
+            stocks.filter((item) => item.stock > item.threshold).length
+          } | ` +
+          `Stock faible: ${
+            stocks.filter(
+              (item) => item.stock <= item.threshold && item.stock > 0
+            ).length
+          } | ` +
+          `Rupture: ${stocks.filter((item) => item.stock === 0).length}`,
+        14,
+        30
+      );
+
+      // Préparer les données du tableau
+      const tableData = filteredStocks.map((item) => [
+        item.name,
+        `${item.stock} unités`,
+        `${item.threshold} unités`,
+        item.stock === 0
+          ? "Rupture"
+          : item.stock <= item.threshold
+          ? "Stock faible"
+          : "En stock",
+      ]);
+
+      // Créer le tableau avec autoTable
+      doc.autoTable({
+        head: [["Produit", "Stock Actuel", "Seuil Minimum", "Statut"]],
+        body: tableData,
+        startY: 35,
+        theme: "grid",
+        styles: {
+          fontSize: 9,
+          cellPadding: 3,
+          textColor: [40, 40, 40],
+        },
+        headStyles: {
+          fillColor: [59, 130, 246],
+          textColor: [255, 255, 255],
+          fontStyle: "bold",
+        },
+        alternateRowStyles: {
+          fillColor: [248, 250, 252],
+        },
+        columnStyles: {
+          0: { cellWidth: "auto" },
+          1: { cellWidth: 30 },
+          2: { cellWidth: 30 },
+          3: { cellWidth: 25 },
+        },
+        didDrawCell: (data) => {
+          // Colorer les cellules de statut
+          if (data.column.index === 3 && data.cell.section === "body") {
+            const status = data.cell.raw;
+            if (status === "Rupture") {
+              doc.setTextColor(220, 38, 38);
+            } else if (status === "Stock faible") {
+              doc.setTextColor(217, 119, 6);
+            } else {
+              doc.setTextColor(5, 150, 105);
+            }
+          }
+        },
+      });
+
+      // Pied de page
+      const pageCount = doc.internal.getNumberOfPages();
+      for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setFontSize(8);
+        doc.setTextColor(100, 100, 100);
+        doc.text(
+          `Page ${i} sur ${pageCount}`,
+          doc.internal.pageSize.width / 2,
+          doc.internal.pageSize.height - 10,
+          { align: "center" }
+        );
+      }
+
+      // Sauvegarder le PDF
+      doc.save(`stocks_${new Date().toISOString().split("T")[0]}.pdf`);
+    } catch (error) {
+      console.error("Erreur lors de l'export PDF:", error);
+      setError("Erreur lors de l'export PDF");
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  // Option alternative simplifiée (sans autoTable)
+  const exportToPDFSimple = () => {
+    setExporting(true);
+
+    try {
+      const doc = new jsPDF();
+
+      // Titre
+      doc.setFontSize(16);
+      doc.text("Liste des Stocks", 20, 20);
+      doc.setFontSize(10);
+      doc.text(`Date: ${new Date().toLocaleDateString("fr-FR")}`, 20, 30);
+
+      let yPosition = 50;
+      const lineHeight = 10;
+
+      // En-tête du tableau
+      doc.setFontSize(12);
+      doc.setFont(undefined, "bold");
+      doc.text("Produit", 20, yPosition);
+      doc.text("Stock", 80, yPosition);
+      doc.text("Seuil", 110, yPosition);
+      doc.text("Statut", 140, yPosition);
+
+      yPosition += lineHeight;
+      doc.setFont(undefined, "normal");
+      doc.setFontSize(10);
+
+      // Ligne séparatrice
+      doc.line(20, yPosition - 2, 190, yPosition - 2);
+      yPosition += 5;
+
+      // Données
+      filteredStocks.forEach((item, index) => {
+        if (yPosition > 280) {
+          // Nouvelle page si nécessaire
+          doc.addPage();
+          yPosition = 20;
+        }
+
+        const status =
+          item.stock === 0
+            ? "Rupture"
+            : item.stock <= item.threshold
+            ? "Stock faible"
+            : "En stock";
+
+        // Couleur selon le statut
+        if (status === "Rupture") {
+          doc.setTextColor(220, 38, 38);
+        } else if (status === "Stock faible") {
+          doc.setTextColor(217, 119, 6);
+        } else {
+          doc.setTextColor(5, 150, 105);
+        }
+
+        doc.text(item.name, 20, yPosition);
+        doc.setTextColor(0, 0, 0); // Réinitialiser la couleur
+        doc.text(`${item.stock} unités`, 80, yPosition);
+        doc.text(`${item.threshold} unités`, 110, yPosition);
+        doc.text(status, 140, yPosition);
+
+        yPosition += lineHeight;
+      });
+
+      // Statistiques en bas
+      yPosition += 10;
+      doc.setFontSize(9);
+      doc.text(
+        `Total: ${filteredStocks.length} produits | ` +
+          `En stock: ${
+            stocks.filter((item) => item.stock > item.threshold).length
+          } | ` +
+          `Stock faible: ${
+            stocks.filter(
+              (item) => item.stock <= item.threshold && item.stock > 0
+            ).length
+          } | ` +
+          `Rupture: ${stocks.filter((item) => item.stock === 0).length}`,
+        20,
+        yPosition
+      );
+
+      doc.save(`stocks_${new Date().toISOString().split("T")[0]}.pdf`);
+    } catch (error) {
+      console.error("Erreur lors de l'export PDF:", error);
+      setError("Erreur lors de l'export PDF");
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const handleAddClick = () => setShowAddModal(true);
-
-  // Ouvrir modale édition
   const handleEditClick = (stock) => setSelectedStock(stock);
-
-  // Ouvrir modale suppression
   const handleDeleteClick = (stockId) => setDeleteConfirm(stockId);
 
-  // Confirmer suppression
   const confirmDelete = async (stockId) => {
     try {
-      console.log("Suppression stockId :", stockId);
       await api.delete(`/stocks/${stockId}`);
-      setStocks(stocks.filter((s) => s._id !== stockId));
+      await fetchStocks(); // recharger la liste après suppression
       setDeleteConfirm(null);
     } catch (err) {
-      console.error(err);
       setError("Impossible de supprimer le stock");
     }
   };
 
-  // Annuler suppression
   const cancelDelete = () => setDeleteConfirm(null);
 
   // Filtrage par recherche
@@ -73,7 +272,6 @@ const StockList = () => {
 
   return (
     <div className="max-w-6xl mx-auto bg-white p-8 rounded-xl shadow-sm border border-gray-200">
-      {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
         <div>
           <h2 className="text-2xl font-semibold text-gray-800">
@@ -83,16 +281,24 @@ const StockList = () => {
             Suivez et gérez vos niveaux de stock
           </p>
         </div>
-        <button
-          onClick={handleAddClick}
-          className="px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200 shadow-sm hover:shadow-md flex items-center gap-2 text-sm font-medium"
-        >
-          <Plus className="h-4 w-4" />
-          Nouveau stock
-        </button>
+        <div className="flex gap-3">
+          <button
+            onClick={exportToPDF}
+            className="px-4 py-2.5 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors duration-200 shadow-sm hover:shadow-md flex items-center gap-2 text-sm font-medium"
+          >
+            <Download className="h-4 w-4" />
+            Export PDF
+          </button>
+          <button
+            onClick={handleAddClick}
+            className="px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200 shadow-sm hover:shadow-md flex items-center gap-2 text-sm font-medium"
+          >
+            <Plus className="h-4 w-4" />
+            Nouveau stock
+          </button>
+        </div>
       </div>
 
-      {/* Barre recherche + stats */}
       <div className="bg-gray-50 p-4 rounded-lg mb-6 flex flex-col sm:flex-row justify-between items-center gap-4">
         <div className="relative w-full sm:w-64">
           <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -132,7 +338,6 @@ const StockList = () => {
         </div>
       </div>
 
-      {/* Liste */}
       {loading ? (
         <div className="flex flex-col justify-center items-center h-64">
           <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-blue-600 mb-4"></div>
@@ -197,7 +402,6 @@ const StockList = () => {
                           text: "En stock",
                           color: "bg-green-100 text-green-800",
                         };
-
                   return (
                     <tr
                       key={item._id}
@@ -257,26 +461,24 @@ const StockList = () => {
         </div>
       )}
 
-      {/* Modale d'ajout */}
+      {/* Modale ajout */}
       <AddStockForm
         isOpen={showAddModal}
         onClose={() => setShowAddModal(false)}
-        onStockAdded={fetchStocks}
+        onStockAdded={fetchStocks} // recharge la liste après ajout
       />
-
-      {/* Modale de confirmation suppression */}
+      {/* Modale suppression */}
       <DeleteConfirmationModal
         isOpen={deleteConfirm !== null}
         onCancel={cancelDelete}
         onConfirm={() => confirmDelete(deleteConfirm)}
       />
-
-      {/* Modale mise à jour */}
+      {/* Modale modif */}
       <UpdateStockForm
         isOpen={!!selectedStock}
         onClose={() => setSelectedStock(null)}
         stockId={selectedStock?._id}
-        onStockUpdated={fetchStocks}
+        onStockUpdated={fetchStocks} // recharge la liste après édition
       />
     </div>
   );
