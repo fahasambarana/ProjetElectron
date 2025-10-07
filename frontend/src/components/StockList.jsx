@@ -4,8 +4,9 @@ import api from "../services/api";
 import DeleteConfirmationModal from "../components/DeleteConfirmationModal";
 import AddStockForm from "../components/AddStockForm";
 import UpdateStockForm from "./UpdateStockForm";
-import jsPDF  from "jspdf";
+import jsPDF from "jspdf";
 import "jspdf-autotable";
+import * as XLSX from "xlsx";
 
 import {
   Plus,
@@ -17,6 +18,7 @@ import {
   RotateCw,
   Box,
   Download,
+  FileSpreadsheet,
 } from "lucide-react";
 
 const StockList = () => {
@@ -28,6 +30,7 @@ const StockList = () => {
   const [error, setError] = useState("");
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [exporting, setExporting] = useState(false);
+  const [exportingXLSX, setExportingXLSX] = useState(false);
   const navigate = useNavigate();
 
   const fetchStocks = async () => {
@@ -49,25 +52,21 @@ const StockList = () => {
     setExporting(true);
 
     try {
-      // Créer une nouvelle instance de jsPDF
       const doc = new jsPDF();
 
-      // Titre principal
       doc.setFontSize(18);
       doc.setTextColor(40, 40, 40);
       doc.text("LISTE DES STOCKS", 105, 15, { align: "center" });
 
-      // Date d'export
       doc.setFontSize(10);
       doc.setTextColor(100, 100, 100);
       doc.text(`Export du ${new Date().toLocaleDateString("fr-FR")}`, 105, 22, {
         align: "center",
       });
 
-      // Statistiques
       doc.setFontSize(9);
       doc.text(
-        `Total: ${filteredStocks.length} produits | ` +
+        `Total: ${filteredStocks.length} materiels | ` +
           `En stock: ${
             stocks.filter((item) => item.stock > item.threshold).length
           } | ` +
@@ -81,7 +80,6 @@ const StockList = () => {
         30
       );
 
-      // Préparer les données du tableau
       const tableData = filteredStocks.map((item) => [
         item.name,
         `${item.stock} unités`,
@@ -93,9 +91,8 @@ const StockList = () => {
           : "En stock",
       ]);
 
-      // Créer le tableau avec autoTable
       doc.autoTable({
-        head: [["Produit", "Stock Actuel", "Seuil Minimum", "Statut"]],
+        head: [["Materiels", "Stock Actuel", "Statut"]],
         body: tableData,
         startY: 35,
         theme: "grid",
@@ -119,7 +116,6 @@ const StockList = () => {
           3: { cellWidth: 25 },
         },
         didDrawCell: (data) => {
-          // Colorer les cellules de statut
           if (data.column.index === 3 && data.cell.section === "body") {
             const status = data.cell.raw;
             if (status === "Rupture") {
@@ -133,7 +129,6 @@ const StockList = () => {
         },
       });
 
-      // Pied de page
       const pageCount = doc.internal.getNumberOfPages();
       for (let i = 1; i <= pageCount; i++) {
         doc.setPage(i);
@@ -147,7 +142,6 @@ const StockList = () => {
         );
       }
 
-      // Sauvegarder le PDF
       doc.save(`stocks_${new Date().toISOString().split("T")[0]}.pdf`);
     } catch (error) {
       console.error("Erreur lors de l'export PDF:", error);
@@ -157,95 +151,143 @@ const StockList = () => {
     }
   };
 
-  // Option alternative simplifiée (sans autoTable)
-  const exportToPDFSimple = () => {
-    setExporting(true);
+  // Export XLSX
+  const exportToXLSX = () => {
+    setExportingXLSX(true);
 
     try {
-      const doc = new jsPDF();
+      // Préparer les données pour Excel
+      const excelData = filteredStocks.map((item) => ({
+        "Nom du Materiels": item.name,
+        "Stock Actuel": item.stock,
+        "Unité": "unités",
+        "Statut": item.stock === 0
+          ? "Rupture"
+          : item.stock <= item.threshold
+          ? "Stock faible"
+          : "En stock",
+      }));
 
-      // Titre
-      doc.setFontSize(16);
-      doc.text("Liste des Stocks", 20, 20);
-      doc.setFontSize(10);
-      doc.text(`Date: ${new Date().toLocaleDateString("fr-FR")}`, 20, 30);
+      // Créer un nouveau workbook
+      const wb = XLSX.utils.book_new();
+      
+      // Créer une feuille avec les données
+      const ws = XLSX.utils.json_to_sheet(excelData);
+      
+      // Définir les largeurs de colonnes
+      const colWidths = [
+        { wch: 30 }, // Nom du Produit
+        { wch: 15 }, // Stock Actuel
+        { wch: 10 }, // Unité
+        { wch: 15 }, // Seuil Minimum
+        { wch: 15 }, // Statut
+      ];
+      ws['!cols'] = colWidths;
 
-      let yPosition = 50;
-      const lineHeight = 10;
+      // Ajouter la feuille au workbook
+      XLSX.utils.book_append_sheet(wb, ws, "Stocks");
 
-      // En-tête du tableau
-      doc.setFontSize(12);
-      doc.setFont(undefined, "bold");
-      doc.text("Produit", 20, yPosition);
-      doc.text("Stock", 80, yPosition);
-      doc.text("Seuil", 110, yPosition);
-      doc.text("Statut", 140, yPosition);
+      // Ajouter une ligne de statistiques
+      const statsData = [
+        ["STATISTIQUES"],
+        [`Date d'export: ${new Date().toLocaleDateString('fr-FR')}`],
+        [`Total produits: ${filteredStocks.length}`],
+        [`En stock: ${stocks.filter((item) => item.stock > item.threshold).length}`],
+        [`Stock faible: ${stocks.filter((item) => item.stock <= item.threshold && item.stock > 0).length}`],
+        [`Rupture: ${stocks.filter((item) => item.stock === 0).length}`],
+      ];
+      
+      const wsStats = XLSX.utils.aoa_to_sheet(statsData);
+      XLSX.utils.book_append_sheet(wb, wsStats, "Statistiques");
 
-      yPosition += lineHeight;
-      doc.setFont(undefined, "normal");
-      doc.setFontSize(10);
+      // Générer le fichier Excel
+      XLSX.writeFile(wb, `stocks_${new Date().toISOString().split("T")[0]}.xlsx`);
 
-      // Ligne séparatrice
-      doc.line(20, yPosition - 2, 190, yPosition - 2);
-      yPosition += 5;
-
-      // Données
-      filteredStocks.forEach((item, index) => {
-        if (yPosition > 280) {
-          // Nouvelle page si nécessaire
-          doc.addPage();
-          yPosition = 20;
-        }
-
-        const status =
-          item.stock === 0
-            ? "Rupture"
-            : item.stock <= item.threshold
-            ? "Stock faible"
-            : "En stock";
-
-        // Couleur selon le statut
-        if (status === "Rupture") {
-          doc.setTextColor(220, 38, 38);
-        } else if (status === "Stock faible") {
-          doc.setTextColor(217, 119, 6);
-        } else {
-          doc.setTextColor(5, 150, 105);
-        }
-
-        doc.text(item.name, 20, yPosition);
-        doc.setTextColor(0, 0, 0); // Réinitialiser la couleur
-        doc.text(`${item.stock} unités`, 80, yPosition);
-        doc.text(`${item.threshold} unités`, 110, yPosition);
-        doc.text(status, 140, yPosition);
-
-        yPosition += lineHeight;
-      });
-
-      // Statistiques en bas
-      yPosition += 10;
-      doc.setFontSize(9);
-      doc.text(
-        `Total: ${filteredStocks.length} produits | ` +
-          `En stock: ${
-            stocks.filter((item) => item.stock > item.threshold).length
-          } | ` +
-          `Stock faible: ${
-            stocks.filter(
-              (item) => item.stock <= item.threshold && item.stock > 0
-            ).length
-          } | ` +
-          `Rupture: ${stocks.filter((item) => item.stock === 0).length}`,
-        20,
-        yPosition
-      );
-
-      doc.save(`stocks_${new Date().toISOString().split("T")[0]}.pdf`);
     } catch (error) {
-      console.error("Erreur lors de l'export PDF:", error);
-      setError("Erreur lors de l'export PDF");
+      console.error("Erreur lors de l'export XLSX:", error);
+      setError("Erreur lors de l'export Excel");
     } finally {
-      setExporting(false);
+      setExportingXLSX(false);
+    }
+  };
+
+  // Export XLSX avancé avec mise en forme
+  const exportToXLSXAdvanced = () => {
+    setExportingXLSX(true);
+
+    try {
+      // Créer un nouveau workbook
+      const wb = XLSX.utils.book_new();
+
+      // Données principales
+      const data = filteredStocks.map((item) => [
+        item.name,
+        item.stock,
+        item.threshold,
+        item.stock === 0
+          ? "Rupture"
+          : item.stock <= item.threshold
+          ? "Stock faible"
+          : "En stock",
+      ]);
+
+      // Ajouter l'en-tête
+      data.unshift(["Produit", "Stock Actuel", "Statut"]);
+
+      // Créer la feuille
+      const ws = XLSX.utils.aoa_to_sheet(data);
+
+      // Appliquer des styles de base
+      if (ws['!ref']) {
+        const range = XLSX.utils.decode_range(ws['!ref']);
+        
+        // Style pour l'en-tête
+        for (let C = range.s.c; C <= range.e.c; ++C) {
+          const cellAddress = XLSX.utils.encode_cell({ r: 0, c: C });
+          if (!ws[cellAddress]) continue;
+          ws[cellAddress].s = {
+            font: { bold: true, color: { rgb: "FFFFFF" } },
+            fill: { fgColor: { rgb: "3B82F6" } },
+            alignment: { horizontal: "center" }
+          };
+        }
+
+        // Style pour les statuts
+        for (let R = range.s.r + 1; R <= range.e.r; ++R) {
+          const statusCell = XLSX.utils.encode_cell({ r: R, c: 3 });
+          if (!ws[statusCell]) continue;
+          
+          const status = ws[statusCell].v;
+          let color = "000000";
+          
+          if (status === "Rupture") color = "DC2626";
+          else if (status === "Stock faible") color = "D97706";
+          else if (status === "En stock") color = "059669";
+          
+          ws[statusCell].s = {
+            font: { bold: true, color: { rgb: color } }
+          };
+        }
+      }
+
+      // Définir les largeurs de colonnes
+      ws['!cols'] = [
+        { wch: 30 }, // Produit
+        { wch: 15 }, // Stock Actuel
+        { wch: 15 }, // Seuil Minimum
+        { wch: 15 }, // Statut
+      ];
+
+      XLSX.utils.book_append_sheet(wb, ws, "Stocks");
+
+      // Générer le fichier
+      XLSX.writeFile(wb, `stocks_${new Date().toISOString().split("T")[0]}.xlsx`);
+
+    } catch (error) {
+      console.error("Erreur lors de l'export XLSX avancé:", error);
+      setError("Erreur lors de l'export Excel");
+    } finally {
+      setExportingXLSX(false);
     }
   };
 
@@ -256,7 +298,7 @@ const StockList = () => {
   const confirmDelete = async (stockId) => {
     try {
       await api.delete(`/stocks/${stockId}`);
-      await fetchStocks(); // recharger la liste après suppression
+      await fetchStocks();
       setDeleteConfirm(null);
     } catch (err) {
       setError("Impossible de supprimer le stock");
@@ -265,7 +307,6 @@ const StockList = () => {
 
   const cancelDelete = () => setDeleteConfirm(null);
 
-  // Filtrage par recherche
   const filteredStocks = stocks.filter((item) =>
     item.name.toLowerCase().includes(search.toLowerCase())
   );
@@ -283,11 +324,38 @@ const StockList = () => {
         </div>
         <div className="flex gap-3">
           <button
-            onClick={exportToPDF}
-            className="px-4 py-2.5 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors duration-200 shadow-sm hover:shadow-md flex items-center gap-2 text-sm font-medium"
+            onClick={exportToXLSX}
+            disabled={exportingXLSX || filteredStocks.length === 0}
+            className="px-4 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors duration-200 shadow-sm hover:shadow-md flex items-center gap-2 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <Download className="h-4 w-4" />
-            Export PDF
+            {exportingXLSX ? (
+              <>
+                <RotateCw className="h-4 w-4 animate-spin" />
+                Génération...
+              </>
+            ) : (
+              <>
+                <FileSpreadsheet className="h-4 w-4" />
+                Export XLSX
+              </>
+            )}
+          </button>
+          <button
+            onClick={exportToPDF}
+            disabled={exporting || filteredStocks.length === 0}
+            className="px-4 py-2.5 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors duration-200 shadow-sm hover:shadow-md flex items-center gap-2 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {exporting ? (
+              <>
+                <RotateCw className="h-4 w-4 animate-spin" />
+                Génération...
+              </>
+            ) : (
+              <>
+                <Download className="h-4 w-4" />
+                Export PDF
+              </>
+            )}
           </button>
           <button
             onClick={handleAddClick}
@@ -366,9 +434,7 @@ const StockList = () => {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Stock
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Seuil Min
-                </th>
+               
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Statut
                 </th>
@@ -424,9 +490,7 @@ const StockList = () => {
                           {item.stock} unités
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {item.threshold} unités
-                      </td>
+                     
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span
                           className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${status.color}`}
@@ -461,24 +525,21 @@ const StockList = () => {
         </div>
       )}
 
-      {/* Modale ajout */}
       <AddStockForm
         isOpen={showAddModal}
         onClose={() => setShowAddModal(false)}
-        onStockAdded={fetchStocks} // recharge la liste après ajout
+        onStockAdded={fetchStocks}
       />
-      {/* Modale suppression */}
       <DeleteConfirmationModal
         isOpen={deleteConfirm !== null}
         onCancel={cancelDelete}
         onConfirm={() => confirmDelete(deleteConfirm)}
       />
-      {/* Modale modif */}
       <UpdateStockForm
         isOpen={!!selectedStock}
         onClose={() => setSelectedStock(null)}
         stockId={selectedStock?._id}
-        onStockUpdated={fetchStocks} // recharge la liste après édition
+        onStockUpdated={fetchStocks}
       />
     </div>
   );
