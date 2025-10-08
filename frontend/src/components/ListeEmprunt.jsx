@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 import EmpruntFormModal from "./EmpruntFormModal";
+import EmpruntUpdateModal from "./EmpruntUpdateForm";
 import { Plus, Search, Filter, Edit, Save, X, Trash2, CheckCircle, Clock, Download } from "lucide-react";
 import jsPDF from "jspdf";
 import "jspdf-autotable";
@@ -10,6 +11,8 @@ export default function EmpruntList() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [showModal, setShowModal] = useState(false);
+  const [showUpdateModal, setShowUpdateModal] = useState(false);
+  const [selectedEmprunt, setSelectedEmprunt] = useState(null);
   const [editEmpruntId, setEditEmpruntId] = useState(null);
   const [editHeureEntree, setEditHeureEntree] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
@@ -19,8 +22,25 @@ export default function EmpruntList() {
   const fetchEmprunts = async () => {
     try {
       const res = await axios.get("http://localhost:5000/api/emprunts");
-      setEmprunts(res.data);
+      
+      // Vérifier la structure de la réponse
+      console.log("Réponse API:", res.data);
+      
+      // Si res.data a une propriété data qui contient le tableau
+      const empruntsData = res.data.data || res.data;
+      
+      // S'assurer que c'est bien un tableau avant de trier
+      if (Array.isArray(empruntsData)) {
+        // Trier les emprunts par date décroissante (plus récent en premier)
+        const sortedEmprunts = empruntsData.sort((a, b) => new Date(b.date) - new Date(a.date));
+        setEmprunts(sortedEmprunts);
+      } else {
+        console.error("Les données reçues ne sont pas un tableau:", empruntsData);
+        setEmprunts([]);
+      }
+      
     } catch (err) {
+      console.error("Erreur détaillée:", err);
       setError("Impossible de charger les emprunts");
     } finally {
       setLoading(false);
@@ -61,7 +81,7 @@ export default function EmpruntList() {
         30
       );
       
-      // Préparer les données du tableau
+      // Préparer les données du tableau (triées par date décroissante)
       const tableData = filteredEmprunts.map(emprunt => [
         emprunt.matricule,
         emprunt.prenoms,
@@ -139,7 +159,19 @@ export default function EmpruntList() {
   };
 
   const handleEmpruntAdded = (newEmprunt) => {
+    // Ajouter le nouvel emprunt au début de la liste (le plus récent en premier)
     setEmprunts([newEmprunt, ...emprunts]);
+  };
+
+  const handleEmpruntUpdated = (updatedEmprunt) => {
+    setEmprunts(emprunts.map((e) => (e._id === updatedEmprunt._id ? updatedEmprunt : e)));
+    setShowUpdateModal(false);
+    setSelectedEmprunt(null);
+  };
+
+  const handleEditClick = (emprunt) => {
+    setSelectedEmprunt(emprunt);
+    setShowUpdateModal(true);
   };
 
   const handleRenduClick = async (empruntId) => {
@@ -148,7 +180,9 @@ export default function EmpruntList() {
         `http://localhost:5000/api/emprunts/rendu/${empruntId}`,
         { heureEntree: new Date().toLocaleTimeString() }
       );
-      setEmprunts(emprunts.map((e) => (e._id === empruntId ? res.data : e)));
+      // Utiliser res.data.data si la réponse a une structure {success, message, data}
+      const updatedEmprunt = res.data.data || res.data;
+      setEmprunts(emprunts.map((e) => (e._id === empruntId ? updatedEmprunt : e)));
     } catch (err) {
       alert("Impossible de marquer le matériel rendu");
     }
@@ -164,17 +198,14 @@ export default function EmpruntList() {
     }
   };
 
-  const handleEditClick = (emprunt) => {
-    setEditEmpruntId(emprunt._id);
-    setEditHeureEntree(emprunt.heureEntree || "");
-  };
-
   const handleEditSave = async (empruntId) => {
     try {
       const res = await axios.put(`http://localhost:5000/api/emprunts/rendu/${empruntId}`, {
         heureEntree: editHeureEntree,
       });
-      setEmprunts(emprunts.map((e) => (e._id === empruntId ? res.data : e)));
+      // Utiliser res.data.data si la réponse a une structure {success, message, data}
+      const updatedEmprunt = res.data.data || res.data;
+      setEmprunts(emprunts.map((e) => (e._id === empruntId ? updatedEmprunt : e)));
       setEditEmpruntId(null);
       setEditHeureEntree("");
     } catch (err) {
@@ -187,19 +218,22 @@ export default function EmpruntList() {
     setEditHeureEntree("");
   };
 
-  const filteredEmprunts = emprunts.filter((emprunt) => {
-    const matchesSearch = 
-      emprunt.matricule.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      emprunt.prenoms.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (emprunt.materiel && emprunt.materiel.name.toLowerCase().includes(searchTerm.toLowerCase()));
-    
-    const matchesStatus = 
-      filterStatus === "all" || 
-      (filterStatus === "rendu" && emprunt.heureEntree) || 
-      (filterStatus === "non-rendu" && !emprunt.heureEntree);
-    
-    return matchesSearch && matchesStatus;
-  });
+  const filteredEmprunts = emprunts
+    .filter((emprunt) => {
+      const matchesSearch = 
+        emprunt.matricule.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        emprunt.prenoms.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (emprunt.materiel && emprunt.materiel.name.toLowerCase().includes(searchTerm.toLowerCase()));
+      
+      const matchesStatus = 
+        filterStatus === "all" || 
+        (filterStatus === "rendu" && emprunt.heureEntree) || 
+        (filterStatus === "non-rendu" && !emprunt.heureEntree);
+      
+      return matchesSearch && matchesStatus;
+    })
+    // Tri supplémentaire pour s'assurer que les résultats filtrés sont aussi triés par date décroissante
+    .sort((a, b) => new Date(b.date) - new Date(a.date));
 
   return (
     <div className="max-w-7xl mx-auto p-6 bg-white rounded-xl shadow-md border border-gray-100">
@@ -356,25 +390,12 @@ export default function EmpruntList() {
                       </button>
                     )}
                     <button
-                      onClick={() =>
-                        editEmpruntId === e._id
-                          ? handleEditSave(e._id)
-                          : handleEditClick(e)
-                      }
+                      onClick={() => handleEditClick(e)}
                       className="text-blue-600 hover:text-blue-900 p-1.5 rounded-md hover:bg-blue-50"
-                      title={editEmpruntId === e._id ? "Enregistrer" : "Modifier"}
+                      title="Modifier"
                     >
-                      {editEmpruntId === e._id ? <Save size={18} /> : <Edit size={18} />}
+                      <Edit size={18} />
                     </button>
-                    {editEmpruntId === e._id && (
-                      <button
-                        onClick={handleEditCancel}
-                        className="text-gray-600 hover:text-gray-900 p-1.5 rounded-md hover:bg-gray-50"
-                        title="Annuler"
-                      >
-                        <X size={18} />
-                      </button>
-                    )}
                     <button
                       onClick={() => handleDeleteClick(e._id)}
                       className="text-red-600 hover:text-red-900 p-1.5 rounded-md hover:bg-red-50"
@@ -399,6 +420,16 @@ export default function EmpruntList() {
         isOpen={showModal}
         onClose={() => setShowModal(false)}
         onEmpruntAdded={handleEmpruntAdded}
+      />
+
+      <EmpruntUpdateModal
+        isOpen={showUpdateModal}
+        onClose={() => {
+          setShowUpdateModal(false);
+          setSelectedEmprunt(null);
+        }}
+        emprunt={selectedEmprunt}
+        onEmpruntUpdated={handleEmpruntUpdated}
       />
     </div>
   );

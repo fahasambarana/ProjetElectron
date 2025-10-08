@@ -1,22 +1,23 @@
-const express = require("express");
+const express = require('express');
 const router = express.Router();
-const empruntController = require("../controllers/empruntController");
+const empruntController = require('../controllers/empruntController');
 
-// Créer un nouvel emprunt
-router.post("/", empruntController.createEmprunt);
+// GET /api/emprunts - Lister tous les emprunts
+router.get('/', empruntController.getEmprunts);
 
-// Lister tous les emprunts
-router.get("/", empruntController.getEmprunts);
+// GET /api/emprunts/:id - Récupérer un emprunt par ID
+router.get('/:id', empruntController.getEmpruntById);
 
-router.put("/rendu/:id", empruntController.rendu);
+// POST /api/emprunts - Créer un nouvel emprunt
+router.post('/', empruntController.createEmprunt);
 
-// Récupérer un emprunt par ID
-router.get("/:id", empruntController.getEmpruntById);
+// PUT /api/emprunts/:id - Modifier complètement un emprunt
+router.put('/:id', empruntController.updateEmprunt);
 
-// Mettre à jour l'heure d'entrée (retour matériel)
-router.put("/:id/retour", empruntController.updateHeureEntree);
+// PUT /api/emprunts/rendu/:id - Marquer comme rendu (heure d'entrée seulement)
+router.put('/rendu/:id', empruntController.marquerRendu);
 
-// Supprimer un emprunt
-router.delete("/:id", empruntController.deleteEmprunt);
+// DELETE /api/emprunts/:id - Supprimer un emprunt
+router.delete('/:id', empruntController.deleteEmprunt);
 
 module.exports = router;
