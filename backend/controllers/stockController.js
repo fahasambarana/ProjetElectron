@@ -77,3 +77,15 @@ exports.deleteStock = async (req, res) => {
     res.status(500).json({ message: "Erreur serveur" });
   }
 };
+
+// Compter tous les stocks
+exports.countStocks = async (req, res) => {
+  try {
+    const count = await Stock.countDocuments();
+    res.json({ count });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Erreur serveur" });
+  }
+};
+

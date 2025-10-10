@@ -2,7 +2,16 @@ import React, { useState, useEffect } from "react";
 import axios from "axios";
 import EmpruntFormModal from "./EmpruntFormModal";
 import EmpruntUpdateModal from "./EmpruntUpdateForm";
-import { Plus, Search, Filter, Edit, Save, X, Trash2, CheckCircle, Clock, Download } from "lucide-react";
+import {
+  Plus,
+  Search,
+  Filter,
+  Edit,
+  Trash2,
+  CheckCircle,
+  Clock,
+  Download,
+} from "lucide-react";
 import jsPDF from "jspdf";
 import "jspdf-autotable";
 
@@ -13,34 +22,27 @@ export default function EmpruntList() {
   const [showModal, setShowModal] = useState(false);
   const [showUpdateModal, setShowUpdateModal] = useState(false);
   const [selectedEmprunt, setSelectedEmprunt] = useState(null);
-  const [editEmpruntId, setEditEmpruntId] = useState(null);
-  const [editHeureEntree, setEditHeureEntree] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
   const [exporting, setExporting] = useState(false);
 
   const fetchEmprunts = async () => {
     try {
+      setLoading(true);
       const res = await axios.get("http://localhost:5000/api/emprunts");
-      
-      // Vérifier la structure de la réponse
-      console.log("Réponse API:", res.data);
-      
-      // Si res.data a une propriété data qui contient le tableau
+
       const empruntsData = res.data.data || res.data;
-      
-      // S'assurer que c'est bien un tableau avant de trier
+
       if (Array.isArray(empruntsData)) {
-        // Trier les emprunts par date décroissante (plus récent en premier)
-        const sortedEmprunts = empruntsData.sort((a, b) => new Date(b.date) - new Date(a.date));
+        const sortedEmprunts = empruntsData.sort(
+          (a, b) => new Date(b.date) - new Date(a.date)
+        );
         setEmprunts(sortedEmprunts);
       } else {
-        console.error("Les données reçues ne sont pas un tableau:", empruntsData);
         setEmprunts([]);
       }
-      
     } catch (err) {
-      console.error("Erreur détaillée:", err);
+      console.error("Erreur:", err);
       setError("Impossible de charger les emprunts");
     } finally {
       setLoading(false);
@@ -51,120 +53,16 @@ export default function EmpruntList() {
     fetchEmprunts();
   }, []);
 
-  // Fonction d'export PDF
-  const exportToPDF = () => {
-    setExporting(true);
-    
-    try {
-      const doc = new jsPDF();
-      
-      // Titre principal
-      doc.setFontSize(18);
-      doc.setTextColor(40, 40, 40);
-      doc.text('LISTE DES EMPRUNTS', 105, 15, { align: 'center' });
-      
-      // Date d'export
-      doc.setFontSize(10);
-      doc.setTextColor(100, 100, 100);
-      doc.text(`Export du ${new Date().toLocaleDateString('fr-FR')}`, 105, 22, { align: 'center' });
-      
-      // Statistiques
-      const empruntsRendus = emprunts.filter(e => e.heureEntree).length;
-      const empruntsEnCours = emprunts.filter(e => !e.heureEntree).length;
-      
-      doc.setFontSize(9);
-      doc.text(
-        `Total: ${filteredEmprunts.length} emprunts | ` +
-        `En cours: ${empruntsEnCours} | ` +
-        `Rendus: ${empruntsRendus}`,
-        14,
-        30
-      );
-      
-      // Préparer les données du tableau (triées par date décroissante)
-      const tableData = filteredEmprunts.map(emprunt => [
-        emprunt.matricule,
-        emprunt.prenoms,
-        new Date(emprunt.date).toLocaleDateString('fr-FR'),
-        emprunt.materiel && emprunt.materiel.name ? emprunt.materiel.name : 'N/A',
-        emprunt.heureSortie,
-        emprunt.heureEntree || '-',
-        emprunt.heureEntree ? 'Rendu' : 'En cours'
-      ]);
-      
-      // Créer le tableau avec autoTable
-      doc.autoTable({
-        head: [['Matricule', 'Prénoms', 'Date', 'Matériel', 'Heure Sortie', 'Heure Entrée', 'Statut']],
-        body: tableData,
-        startY: 35,
-        theme: 'grid',
-        styles: { 
-          fontSize: 8,
-          cellPadding: 2,
-          textColor: [40, 40, 40]
-        },
-        headStyles: { 
-          fillColor: [59, 130, 246],
-          textColor: [255, 255, 255],
-          fontStyle: 'bold'
-        },
-        alternateRowStyles: {
-          fillColor: [248, 250, 252]
-        },
-        columnStyles: {
-          0: { cellWidth: 25 },
-          1: { cellWidth: 35 },
-          2: { cellWidth: 25 },
-          3: { cellWidth: 30 },
-          4: { cellWidth: 20 },
-          5: { cellWidth: 20 },
-          6: { cellWidth: 20 }
-        },
-        didDrawCell: (data) => {
-          // Colorer les cellules de statut
-          if (data.column.index === 6 && data.cell.section === 'body') {
-            const status = data.cell.raw;
-            if (status === 'Rendu') {
-              doc.setTextColor(5, 150, 105); // Vert
-            } else {
-              doc.setTextColor(217, 119, 6); // Orange
-            }
-          }
-        }
-      });
-      
-      // Pied de page
-      const pageCount = doc.internal.getNumberOfPages();
-      for (let i = 1; i <= pageCount; i++) {
-        doc.setPage(i);
-        doc.setFontSize(8);
-        doc.setTextColor(100, 100, 100);
-        doc.text(
-          `Page ${i} sur ${pageCount}`,
-          doc.internal.pageSize.width / 2,
-          doc.internal.pageSize.height - 10,
-          { align: 'center' }
-        );
-      }
-      
-      // Sauvegarder le PDF
-      doc.save(`emprunts_${new Date().toISOString().split('T')[0]}.pdf`);
-      
-    } catch (error) {
-      console.error('Erreur lors de l\'export PDF:', error);
-      alert('Erreur lors de la génération du PDF');
-    } finally {
-      setExporting(false);
-    }
-  };
-
+  // Fonctions de gestion des actions
   const handleEmpruntAdded = (newEmprunt) => {
-    // Ajouter le nouvel emprunt au début de la liste (le plus récent en premier)
-    setEmprunts([newEmprunt, ...emprunts]);
+    const empruntData = newEmprunt.data || newEmprunt;
+    setEmprunts(prev => [empruntData, ...prev]);
+    setShowModal(false);
   };
 
   const handleEmpruntUpdated = (updatedEmprunt) => {
-    setEmprunts(emprunts.map((e) => (e._id === updatedEmprunt._id ? updatedEmprunt : e)));
+    const empruntData = updatedEmprunt.data || updatedEmprunt;
+    setEmprunts(prev => prev.map(e => e._id === empruntData._id ? empruntData : e));
     setShowUpdateModal(false);
     setSelectedEmprunt(null);
   };
@@ -178,13 +76,15 @@ export default function EmpruntList() {
     try {
       const res = await axios.put(
         `http://localhost:5000/api/emprunts/rendu/${empruntId}`,
-        { heureEntree: new Date().toLocaleTimeString() }
+        { heureEntree: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) }
       );
-      // Utiliser res.data.data si la réponse a une structure {success, message, data}
+      
       const updatedEmprunt = res.data.data || res.data;
-      setEmprunts(emprunts.map((e) => (e._id === empruntId ? updatedEmprunt : e)));
+      setEmprunts(prev => prev.map(e => e._id === empruntId ? updatedEmprunt : e));
+      
     } catch (err) {
-      alert("Impossible de marquer le matériel rendu");
+      console.error("Erreur:", err);
+      alert(err.response?.data?.message || "Impossible de marquer le matériel rendu");
     }
   };
 
@@ -192,44 +92,148 @@ export default function EmpruntList() {
     if (!window.confirm("Voulez-vous vraiment supprimer cet emprunt ?")) return;
     try {
       await axios.delete(`http://localhost:5000/api/emprunts/${empruntId}`);
-      setEmprunts(emprunts.filter((e) => e._id !== empruntId));
+      setEmprunts(prev => prev.filter(e => e._id !== empruntId));
     } catch (err) {
-      alert("Impossible de supprimer l'emprunt");
+      console.error("Erreur:", err);
+      alert(err.response?.data?.message || "Impossible de supprimer l'emprunt");
     }
   };
 
-  const handleEditSave = async (empruntId) => {
+  // Fonction d'export PDF
+  const exportToPDF = () => {
+    setExporting(true);
+
     try {
-      const res = await axios.put(`http://localhost:5000/api/emprunts/rendu/${empruntId}`, {
-        heureEntree: editHeureEntree,
-      });
-      // Utiliser res.data.data si la réponse a une structure {success, message, data}
-      const updatedEmprunt = res.data.data || res.data;
-      setEmprunts(emprunts.map((e) => (e._id === empruntId ? updatedEmprunt : e)));
-      setEditEmpruntId(null);
-      setEditHeureEntree("");
-    } catch (err) {
-      alert("Impossible de mettre à jour l'heure d'entrée");
-    }
-  };
+      const doc = new jsPDF();
 
-  const handleEditCancel = () => {
-    setEditEmpruntId(null);
-    setEditHeureEntree("");
+      // Titre principal
+      doc.setFontSize(18);
+      doc.setTextColor(40, 40, 40);
+      doc.text("LISTE DES EMPRUNTS", 105, 15, { align: "center" });
+
+      // Date d'export
+      doc.setFontSize(10);
+      doc.setTextColor(100, 100, 100);
+      doc.text(`Export du ${new Date().toLocaleDateString("fr-FR")}`, 105, 22, {
+        align: "center",
+      });
+
+      // Statistiques
+      const empruntsRendus = emprunts.filter((e) => e.heureEntree).length;
+      const empruntsEnCours = emprunts.filter((e) => !e.heureEntree).length;
+
+      doc.setFontSize(9);
+      doc.text(
+        `Total: ${filteredEmprunts.length} emprunts | ` +
+          `En cours: ${empruntsEnCours} | ` +
+          `Rendus: ${empruntsRendus}`,
+        14,
+        30
+      );
+
+      // Préparer les données du tableau (triées par date décroissante)
+      const tableData = filteredEmprunts.map((emprunt) => [
+        emprunt.matricule,
+        emprunt.prenoms,
+        new Date(emprunt.date).toLocaleDateString("fr-FR"),
+        emprunt.materiel && emprunt.materiel.name
+          ? emprunt.materiel.name
+          : "N/A",
+        emprunt.heureSortie,
+        emprunt.heureEntree || "-",
+        emprunt.heureEntree ? "Rendu" : "En cours",
+      ]);
+
+      // Créer le tableau avec autoTable
+      doc.autoTable({
+        head: [
+          [
+            "Matricule",
+            "Prénoms",
+            "Date",
+            "Matériel",
+            "Heure Sortie",
+            "Heure Entrée",
+            "Statut",
+          ],
+        ],
+        body: tableData,
+        startY: 35,
+        theme: "grid",
+        styles: {
+          fontSize: 8,
+          cellPadding: 2,
+          textColor: [40, 40, 40],
+        },
+        headStyles: {
+          fillColor: [59, 130, 246],
+          textColor: [255, 255, 255],
+          fontStyle: "bold",
+        },
+        alternateRowStyles: {
+          fillColor: [248, 250, 252],
+        },
+        columnStyles: {
+          0: { cellWidth: 25 },
+          1: { cellWidth: 35 },
+          2: { cellWidth: 25 },
+          3: { cellWidth: 30 },
+          4: { cellWidth: 20 },
+          5: { cellWidth: 20 },
+          6: { cellWidth: 20 },
+        },
+        didDrawCell: (data) => {
+          // Colorer les cellules de statut
+          if (data.column.index === 6 && data.cell.section === "body") {
+            const status = data.cell.raw;
+            if (status === "Rendu") {
+              doc.setTextColor(5, 150, 105); // Vert
+            } else {
+              doc.setTextColor(217, 119, 6); // Orange
+            }
+          }
+        },
+      });
+
+      // Pied de page
+      const pageCount = doc.internal.getNumberOfPages();
+      for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setFontSize(8);
+        doc.setTextColor(100, 100, 100);
+        doc.text(
+          `Page ${i} sur ${pageCount}`,
+          doc.internal.pageSize.width / 2,
+          doc.internal.pageSize.height - 10,
+          { align: "center" }
+        );
+      }
+
+      // Sauvegarder le PDF
+      doc.save(`emprunts_${new Date().toISOString().split("T")[0]}.pdf`);
+    } catch (error) {
+      console.error("Erreur lors de l'export PDF:", error);
+      alert("Erreur lors de la génération du PDF");
+    } finally {
+      setExporting(false);
+    }
   };
 
   const filteredEmprunts = emprunts
     .filter((emprunt) => {
-      const matchesSearch = 
+      const matchesSearch =
         emprunt.matricule.toLowerCase().includes(searchTerm.toLowerCase()) ||
         emprunt.prenoms.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (emprunt.materiel && emprunt.materiel.name.toLowerCase().includes(searchTerm.toLowerCase()));
-      
-      const matchesStatus = 
-        filterStatus === "all" || 
-        (filterStatus === "rendu" && emprunt.heureEntree) || 
+        (emprunt.materiel &&
+          emprunt.materiel.name
+            .toLowerCase()
+            .includes(searchTerm.toLowerCase()));
+
+      const matchesStatus =
+        filterStatus === "all" ||
+        (filterStatus === "rendu" && emprunt.heureEntree) ||
         (filterStatus === "non-rendu" && !emprunt.heureEntree);
-      
+
       return matchesSearch && matchesStatus;
     })
     // Tri supplémentaire pour s'assurer que les résultats filtrés sont aussi triés par date décroissante
@@ -239,8 +243,12 @@ export default function EmpruntList() {
     <div className="max-w-7xl mx-auto p-6 bg-white rounded-xl shadow-md border border-gray-100">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-gray-800">Gestion des Emprunts</h2>
-          <p className="text-gray-500 mt-1">Suivez et gérez tous les emprunts de matériel</p>
+          <h2 className="text-2xl font-bold text-gray-800">
+            Gestion des Emprunts
+          </h2>
+          <p className="text-gray-500 mt-1">
+            Suivez et gérez tous les emprunts de matériel
+          </p>
         </div>
         <div className="flex gap-3">
           <button
@@ -283,12 +291,12 @@ export default function EmpruntList() {
             className="pl-10 pr-4 py-2.5 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           />
         </div>
-        
+
         <div className="flex gap-2">
           <div className="flex items-center bg-gray-100 px-3 rounded-lg border border-gray-300">
             <Filter size={18} className="text-gray-500 mr-2" />
-            <select 
-              value={filterStatus} 
+            <select
+              value={filterStatus}
               onChange={(e) => setFilterStatus(e.target.value)}
               className="bg-transparent py-2.5 focus:outline-none focus:ring-0"
             >
@@ -352,19 +360,11 @@ export default function EmpruntList() {
                   <td className="px-6 py-4 whitespace-nowrap">
                     {e.materiel && e.materiel.name}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">{e.heureSortie}</td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    {editEmpruntId === e._id ? (
-                      <input
-                        type="text"
-                        value={editHeureEntree}
-                        onChange={(ev) => setEditHeureEntree(ev.target.value)}
-                        className="border rounded px-2 py-1 w-24 text-sm focus:ring-blue-500 focus:border-blue-500"
-                        placeholder="HH:MM"
-                      />
-                    ) : (
-                      e?.heureEntree ?? "-"
-                    )}
+                    {e.heureSortie}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    {e?.heureEntree || "-"}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     {e.heureEntree ? (

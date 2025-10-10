@@ -2,7 +2,7 @@
 # sync-surveillance.sh
 
 VOTRE_MACHINE="192.168.0.28"
-AUTRE_MACHINE="192.168.0.8"
+AUTRE_MACHINE="192.168.0.25"
 BASE_DONNEES="stock_db"
 
 echo "👀 Surveillance active - Ctrl+C pour arrêter"

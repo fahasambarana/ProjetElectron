@@ -6,30 +6,32 @@ import {
   Navigate,
 } from "react-router-dom";
 
-import Login from "./components/Login";
+import LoginForm from "./components/LoginForm";
+import RegisterForm from "./components/RegisterForm";
 import EmploiDuTemps from "./components/Edt";
 import Dashboard from "./components/Dashboard";
 import Layout from "./components/Layout";
-import ListeEdt from "./components/ListeEdt"; // ✅ Import du ListeEdt
-import StockList from "./components/StockList"; // ✅ Import du StockList
-import AddStockForm from "./components/AddStockForm"; // ✅ Import du AddStockForm
+import ListeEdt from "./components/ListeEdt";
+import StockList from "./components/StockList";
+import AddStockForm from "./components/AddStockForm";
 import UpdateStockForm from "./components/UpdateStockForm";
-import { useAuth, AuthProvider } from "./context/useContext"; // Vérifie que ce chemin est correct
-import ListeEmprunts from "./components/ListeEmprunt"; // ✅ Import du ListeEmprunt
+import { useAuth, AuthProvider } from "./context/useContext";
+import ListeEmprunts from "./components/ListeEmprunt";
+import PrivateRoute from "./components/PrivateRoutes";
 
-const PrivateRoute = ({ children }) => {
-  const { user } = useAuth();
-  return user ? children : <Navigate to="/login" replace />;
-};
+// Composant PrivateRoute vérifie l'authentification
+
 
 function App() {
   return (
     <AuthProvider>
       <Router>
         <Routes>
-          {/* Page Login */}
-          <Route path="/login" element={<Login />} />
-          {/* Tableau de bord */}
+          {/* Routes publiques */}
+          <Route path="/login" element={<LoginForm />} />
+          <Route path="/register" element={<RegisterForm />} />
+
+          {/* Routes privées protégées */}
           <Route
             path="/dashboard"
             element={
@@ -40,7 +42,6 @@ function App() {
               </PrivateRoute>
             }
           />
-          {/* StockList */}
           <Route
             path="/stocklist"
             element={
@@ -50,7 +51,7 @@ function App() {
                 </Layout>
               </PrivateRoute>
             }
-          />{" "}
+          />
           <Route
             path="/addstock"
             element={
@@ -70,7 +71,7 @@ function App() {
                 </Layout>
               </PrivateRoute>
             }
-          />{" "}
+          />
           <Route
             path="/edt"
             element={
@@ -80,7 +81,7 @@ function App() {
                 </Layout>
               </PrivateRoute>
             }
-          />{""}
+          />
           <Route
             path="/emprunt"
             element={
@@ -101,7 +102,8 @@ function App() {
               </PrivateRoute>
             }
           />
-          {/* Route par défaut -> redirige vers dashboard */}
+
+          {/* Route par défaut */}
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </Router>

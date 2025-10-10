@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const empruntController = require('../controllers/empruntController');
 
+router.get("/count", empruntController.countEmprunts);
 // GET /api/emprunts - Lister tous les emprunts
 router.get('/', empruntController.getEmprunts);
 
@@ -19,5 +20,6 @@ router.put('/rendu/:id', empruntController.marquerRendu);
 
 // DELETE /api/emprunts/:id - Supprimer un emprunt
 router.delete('/:id', empruntController.deleteEmprunt);
+
 
 module.exports = router;

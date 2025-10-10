@@ -3,7 +3,7 @@
 
 # === CONFIGURATION ===
 VOTRE_MACHINE="192.168.0.28"    # Votre IP
-AUTRE_MACHINE="192.168.0.8"    # IP de l'autre machine
+AUTRE_MACHINE="192.168.0.25"    # IP de l'autre machine
 BASE_DONNEES="stock_db"
 # === FIN CONFIGURATION ===
 
