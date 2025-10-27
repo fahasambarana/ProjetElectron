@@ -15,8 +15,8 @@ function EditModal({ isOpen, eventData, onClose, onSave, onDelete }) {
   });
 
   // Options pour les sélecteurs
-  const parcoursOptions = ["Informatique", "Mathématiques", "Physique", "Chimie", "Biologie", "Économie", "Droit", "Lettres", "Génie Civil", "Sciences Politiques"];
-  const niveauOptions = ["L1", "L2", "L3", "M1", "M2"];
+  const parcoursOptions = ["GL", "AEII", "tout "];
+  const niveauOptions = ["L1", "L2", "L3", "M1", "M2","tout"];
   const groupeOptions = ["", "Groupe 1", "Groupe 2", "Groupe 3", "Groupe 4", "TD1", "TD2", "TP1", "TP2"];
 
   useEffect(() => {

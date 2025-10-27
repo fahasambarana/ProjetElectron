@@ -427,11 +427,11 @@ export default function ListeEDT() {
                               )}`}
                             >
                               <div className="flex justify-between items-start">
-                                <div className="font-semibold text-sm">
+                                <div className="font-semibold text-xl">
                                   {e.parcours}
                                 </div>
                                 <span
-                                  className={`text-xs px-2 py-0.5 rounded-full ${getNiveauColor(
+                                  className={`text-xl px-2 py-0.5 rounded-full ${getNiveauColor(
                                     e.niveau
                                   )}`}
                                 >
@@ -439,8 +439,8 @@ export default function ListeEDT() {
                                 </span>
                               </div>
                               {e.groupe && (
-                                <div className="text-xs text-gray-600 mt-1">
-                                  Groupe {e.groupe}
+                                <div className="text-xl text-gray-600 mt-1">
+                                   {e.groupe}
                                 </div>
                               )}
                               <div className="text-xs mt-1 flex justify-between items-center">
