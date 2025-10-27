@@ -18,6 +18,7 @@ import UpdateStockForm from "./components/UpdateStockForm";
 import { useAuth, AuthProvider } from "./context/useContext";
 import ListeEmprunts from "./components/ListeEmprunt";
 import PrivateRoute from "./components/PrivateRoutes";
+import StudentList from "./components/StudentsList";
 
 // Composant PrivateRoute vérifie l'authentification
 
@@ -88,6 +89,15 @@ function App() {
               <PrivateRoute>
                 <Layout>
                   <ListeEmprunts />
+                </Layout>
+              </PrivateRoute>
+            }
+          /><Route
+            path="/liststudents"
+            element={
+              <PrivateRoute>
+                <Layout>
+                  <StudentList />
                 </Layout>
               </PrivateRoute>
             }

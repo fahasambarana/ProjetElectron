@@ -183,16 +183,9 @@ export default function ListeEDT() {
 
   const getParcoursColor = (parcours) => {
     const colors = {
-      Informatique: "bg-blue-100 border-blue-400 text-blue-800",
-      Mathématiques: "bg-purple-100 border-purple-400 text-purple-800",
-      Physique: "bg-green-100 border-green-400 text-green-800",
-      Chimie: "bg-yellow-100 border-yellow-400 text-yellow-800",
-      Biologie: "bg-red-100 border-red-400 text-red-800",
-      Économie: "bg-indigo-100 border-indigo-400 text-indigo-800",
-      Droit: "bg-pink-100 border-pink-400 text-pink-800",
-      Lettres: "bg-teal-100 border-teal-400 text-teal-800",
-      "Génie Civil": "bg-orange-100 border-orange-400 text-orange-800",
-      "Sciences Politiques": "bg-cyan-100 border-cyan-400 text-cyan-800",
+      GL: "bg-gray-100 border-blue-400 text-gray-800",
+      AEII: "bg-gray-100 border-purple-400 text-gray-800",
+     
     };
     return colors[parcours] || "bg-gray-100 border-gray-400 text-gray-800";
   };
@@ -246,7 +239,7 @@ export default function ListeEDT() {
               <button
                 onClick={exportToPNG}
                 disabled={isExporting}
-                className="flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-800 transition shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex items-center px-4 py-2 bg-teal-900 text-white rounded-lg hover:bg-teal-800 transition shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isExporting ? (
                   <>
@@ -321,7 +314,7 @@ export default function ListeEDT() {
                   link.download = "emploi_du_temps.csv";
                   link.click();
                 }}
-                className="flex items-center px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition shadow-sm"
+                className="flex items-center px-4 py-2 bg-blue-700 text-white rounded-lg hover:bg-blue-800 transition shadow-sm"
               >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
@@ -342,7 +335,7 @@ export default function ListeEDT() {
 
               <button
                 onClick={() => navigate("/calendrier")}
-                className="flex items-center px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition shadow-sm"
+                className="flex items-center px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-800 transition shadow-sm"
               >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
@@ -421,7 +414,7 @@ export default function ListeEDT() {
               <div className="flex items-end">
                 <button
                   onClick={resetFilters}
-                  className="flex items-center px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition shadow-sm w-full justify-center"
+                  className="flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition shadow-sm w-full justify-center"
                 >
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
@@ -447,7 +440,7 @@ export default function ListeEDT() {
                 <p className="text-sm text-blue-800 font-medium">
                   Filtres actifs :
                   {dateSearch && (
-                    <span className="ml-2 bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                    <span className="ml-2 bg-gray-100 text-blue-800 px-2 py-1 rounded">
                       Semaine du {format(new Date(dateSearch), "dd/MM/yyyy")}
                     </span>
                   )}

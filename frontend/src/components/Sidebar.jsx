@@ -37,6 +37,7 @@ const Sidebar = () => {
     { to: "/emprunt", label: "Emprunts", icon: Users, badge: "5" },
     { to: "/edt", label: "Emploi du temps", icon: Calendar, badge: null },
     { to: "/notifications", label: "Notifications", icon: Bell, badge: "3" },
+    { to: "/listStudents", label: "Liste des Étudiants", icon: Users, badge: null },
     { to: "/settings", label: "Paramètres", icon: Settings, badge: null },
   ];
 
