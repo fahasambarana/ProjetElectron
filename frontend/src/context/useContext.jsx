@@ -1,42 +1,78 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect } from "react";
+import api from "../services/api"; // Axios configuré avec baseURL
+import {jwtDecode} from "jwt-decode";
 
-// Création du contexte
-const AuthContext = createContext(null);
+const AuthContext = createContext();
 
-// Provider pour englober l’app
-export const AuthProvider = ({ children }) => {
+export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true); // pour charger la session
 
-  // Charger l'utilisateur au démarrage si token stocké
+  // Vérifier si token existe et est valide au montage
   useEffect(() => {
-    const token = localStorage.getItem('authToken');
+    const token = localStorage.getItem("token");
     if (token) {
-      // Exemple simple : décoder token ou appeler API pour récupérer user
-      setUser({ token, name: 'Utilisateur' }); // Données simulées
+      try {
+        // Décoder token pour vérifier expiration (optionnel)
+        const decoded = jwtDecode(token);
+        if (decoded.exp * 1000 < Date.now()) {
+          // token expiré
+          localStorage.removeItem("token");
+          setUser(null);
+          setLoading(false);
+          return;
+        }
+
+        // Vérifier token côté backend et récupérer user
+        api
+          .get("/auth/me", {
+            headers: { Authorization: `Bearer ${token}` },
+          })
+          .then((res) => {
+            setUser(res.data.user);
+            setLoading(false);
+          })
+          .catch(() => {
+            localStorage.removeItem("token");
+            setUser(null);
+            setLoading(false);
+          });
+      } catch {
+        localStorage.removeItem("token");
+        setUser(null);
+        setLoading(false);
+      }
+    } else {
+      setLoading(false);
     }
   }, []);
 
-  // Fonction pour "se connecter"
-  const login = (email, password) => {
-    // Simuler appel API login + récupération token
-    const fakeToken = '123456fakeToken';
-    localStorage.setItem('authToken', fakeToken);
-    setUser({ token: fakeToken, name: email });
-    return true; // Indiquer succès
-  };
+  // Fonction login
+  async function login(email, password) {
+    try {
+      const { data } = await api.post("/auth/login", { email, password });
+      localStorage.setItem("token", data.token);
+      setUser(data.user);
+      return true;
+    } catch {
+      return false;
+    }
+  }
 
-  // Fonction pour "se déconnecter"
-  const logout = () => {
-    localStorage.removeItem('authToken');
+  // Fonction logout
+  function logout() {
     setUser(null);
-  };
+    localStorage.removeItem("token");
+  }
 
   return (
-    <AuthContext.Provider value={{ user, login, logout }}>
+    <AuthContext.Provider value={{ user, login, logout, loading }}>
       {children}
     </AuthContext.Provider>
   );
-};
+}
 
-// Hook personnalisé pour utiliser auth
-export const useAuth = () => useContext(AuthContext);
+// Hook pour utiliser le contexte
+export function useAuth() {
+  return useContext(AuthContext);
+}
