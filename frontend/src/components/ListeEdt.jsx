@@ -532,45 +532,6 @@ export default function ListeEDT() {
                     )}
                   </div>
 
-<<<<<<< HEAD
-                      <div className="space-y-2">
-                        {creneauxParJour[jourStr][periode].length > 0 ? (
-                          creneauxParJour[jourStr][periode].map((e) => (
-                            <div
-                              key={e._id}
-                              onClick={() => setSelectedEvent(e)}
-                              className={`p-2 rounded-lg border-l-4 cursor-pointer transition-all hover:shadow-md ${getParcoursColor(
-                                e.parcours
-                              )}`}
-                            >
-                              <div className="flex justify-between items-start">
-                                <div className="font-semibold text-xl">
-                                  {e.parcours}
-                                </div>
-                                <span
-                                  className={`text-xl px-2 py-0.5 rounded-full ${getNiveauColor(
-                                    e.niveau
-                                  )}`}
-                                >
-                                  {e.niveau}
-                                </span>
-                              </div>
-                              {e.groupe && (
-                                <div className="text-xl text-gray-600 mt-1">
-                                   {e.groupe}
-                                </div>
-                              )}
-                              <div className="text-xs mt-1 flex justify-between items-center">
-                                <span>
-                                  {e.startTime} - {e.endTime}
-                                </span>
-                              </div>
-                              {e.professeur && (
-                                <div className="text-xs mt-1 text-gray-600 truncate">
-                                  {e.professeur}
-                                </div>
-                              )}
-=======
                   <div className="divide-y divide-gray-100">
                     {["matin", "apresMidi"].map((periode) => (
                       <div key={periode} className="p-3">
@@ -652,7 +613,6 @@ export default function ListeEDT() {
                                 />
                               </svg>
                               Aucun cours
->>>>>>> 44499073903b79f3bdf056d2131b57a7c6ef640d
                             </div>
                           )}
                         </div>

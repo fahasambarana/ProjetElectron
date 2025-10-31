@@ -1,3 +1,4 @@
+// routes/StudentRoute.js
 const express = require('express');
 const router = express.Router();
 
@@ -7,9 +8,20 @@ const {
   createStudent,
   getStudentByMatricule,
   updateStudent,
-  deleteStudent
+  deleteStudent,
+  studentLogin,
+  getStudentProfile,
+  verifyStudentToken
 } = require('../controllers/studentController');
 
+const { studentAuthMiddleware } = require('../middlewares/AuthMiddleware');
+
+// ===== ROUTES D'AUTHENTIFICATION =====
+router.post('/auth/login', studentLogin);
+router.get('/auth/verify', verifyStudentToken);
+router.get('/auth/me', studentAuthMiddleware, getStudentProfile);
+
+// ===== ROUTES CRUD =====
 // Route for fetching all students (GET) and creating a new student (POST)
 router
   .route('/')
