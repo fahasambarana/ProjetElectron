@@ -5,25 +5,58 @@ export default function EmpruntFormModal({ isOpen, onClose, onEmpruntAdded }) {
   const [form, setForm] = useState({
     matricule: "",
     prenoms: "",
-    date: "",
+    dateEmprunt: "",
     niveau: "",
     parcours: "",
     heureSortie: "",
     materiel: "",
   });
   const [materiels, setMateriels] = useState([]);
+  const [etudiants, setEtudiants] = useState([]);
+  const [filteredEtudiants, setFilteredEtudiants] = useState([]);
+  const [showEtudiantList, setShowEtudiantList] = useState(false);
 
-  // Charger la liste des matériels
+  // Charger la liste des matériels et des étudiants
   useEffect(() => {
     if (isOpen) {
       axios.get("http://localhost:5000/api/stocks").then((res) => {
         setMateriels(res.data);
       });
+      
+      axios.get("http://localhost:5000/api/students").then((res) => {
+        setEtudiants(res.data.data || res.data);
+      });
     }
   }, [isOpen]);
 
+  // Filtrer les étudiants en fonction du matricule saisi
+  useEffect(() => {
+    if (form.matricule.length > 0) {
+      const filtered = etudiants.filter(etudiant =>
+        etudiant.Matricule.toLowerCase().includes(form.matricule.toLowerCase())
+      );
+      setFilteredEtudiants(filtered);
+      setShowEtudiantList(true);
+    } else {
+      setShowEtudiantList(false);
+    }
+  }, [form.matricule, etudiants]);
+
   const handleChange = (e) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    setForm({ ...form, [name]: value });
+  };
+
+  // Sélectionner un étudiant depuis la liste
+  const handleEtudiantSelect = (etudiant) => {
+    setForm({
+      ...form,
+      matricule: etudiant.Matricule,
+      prenoms: etudiant.Nom_et_Prenoms,
+      niveau: etudiant.Niveau,
+      parcours: etudiant.Parcours
+    });
+    setShowEtudiantList(false);
   };
 
   const handleSubmit = async (e) => {
@@ -34,7 +67,7 @@ export default function EmpruntFormModal({ isOpen, onClose, onEmpruntAdded }) {
       setForm({
         matricule: "",
         prenoms: "",
-        date: "",
+        dateEmprunt: "",
         niveau: "",
         parcours: "",
         heureSortie: "",
@@ -42,7 +75,7 @@ export default function EmpruntFormModal({ isOpen, onClose, onEmpruntAdded }) {
       });
       onClose();
     } catch (err) {
-      alert(err.response?.data?.message || "Erreur lors de l’emprunt");
+      alert(err.response?.data?.message || "Erreur lors de l'emprunt");
     }
   };
 
@@ -50,11 +83,11 @@ export default function EmpruntFormModal({ isOpen, onClose, onEmpruntAdded }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-      <div className="bg-white p-6 rounded-xl shadow-xl w-full max-w-2xl relative">
+      <div className="bg-white p-6 rounded-xl shadow-xl w-full max-w-2xl relative max-h-[90vh] overflow-y-auto">
         {/* Bouton de fermeture */}
         <button
           onClick={onClose}
-          className="absolute top-3 right-3 text-gray-500 hover:text-gray-800"
+          className="absolute top-3 right-3 text-gray-500 hover:text-gray-800 text-2xl"
         >
           &times;
         </button>
@@ -63,7 +96,8 @@ export default function EmpruntFormModal({ isOpen, onClose, onEmpruntAdded }) {
 
         <form onSubmit={handleSubmit}>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-            <div>
+            {/* Champ Matricule avec recherche */}
+            <div className="relative">
               <label className="block mb-1 font-medium">Matricule</label>
               <input
                 type="text"
@@ -72,41 +106,66 @@ export default function EmpruntFormModal({ isOpen, onClose, onEmpruntAdded }) {
                 onChange={handleChange}
                 required
                 className="border p-2 rounded w-full"
+                placeholder="Rechercher par matricule..."
               />
+              
+              {/* Liste déroulante des étudiants */}
+              {showEtudiantList && filteredEtudiants.length > 0 && (
+                <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
+                  {filteredEtudiants.map((etudiant) => (
+                    <div
+                      key={etudiant.Matricule}
+                      className="px-4 py-2 hover:bg-blue-50 cursor-pointer border-b border-gray-100"
+                      onClick={() => handleEtudiantSelect(etudiant)}
+                    >
+                      <div className="font-medium text-gray-900">
+                        {etudiant.Matricule}
+                      </div>
+                      <div className="text-sm text-gray-600">
+                        {etudiant.Nom_et_Prenoms} - {etudiant.Niveau} {etudiant.Parcours}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
-            <div>
-              <label className="block mb-1 font-medium">Prénoms</label>
+            {/* Prénoms (rempli automatiquement) */}
+            {/* <div>
+              <label className="block mb-1 font-medium">Nom et Prénoms</label>
               <input
                 type="text"
                 name="prenoms"
                 value={form.prenoms}
                 onChange={handleChange}
                 required
-                className="border p-2 rounded w-full"
+                className="border p-2 rounded w-full bg-gray-50"
+                readOnly
               />
-            </div>
+            </div> */}
 
+            {/* Date */}
             <div>
               <label className="block mb-1 font-medium">Date</label>
               <input
                 type="date"
-                name="date"
-                value={form.date}
+                name="dateEmprunt"
+                value={form.dateEmprunt}
                 onChange={handleChange}
                 required
                 className="border p-2 rounded w-full"
               />
             </div>
 
-            <div>
+            {/* Niveau (rempli automatiquement) */}
+            {/* <div>
               <label className="block mb-1 font-medium">Niveau</label>
               <select
                 name="niveau"
                 value={form.niveau}
                 onChange={handleChange}
                 required
-                className="border p-2 rounded w-full"
+                className="border p-2 rounded w-full bg-gray-50"
               >
                 <option value="">-- Choisir un niveau --</option>
                 <option value="L1">L1</option>
@@ -115,23 +174,25 @@ export default function EmpruntFormModal({ isOpen, onClose, onEmpruntAdded }) {
                 <option value="M1">M1</option>
                 <option value="M2">M2</option>
               </select>
-            </div>
+            </div> */}
 
-            <div>
+            {/* Parcours (rempli automatiquement) */}
+            {/* <div>
               <label className="block mb-1 font-medium">Parcours</label>
               <select
                 name="parcours"
                 value={form.parcours}
                 onChange={handleChange}
                 required
-                className="border p-2 rounded w-full"
+                className="border p-2 rounded w-full bg-gray-50"
               >
                 <option value="">-- Choisir un parcours --</option>
                 <option value="GL">GL</option>
                 <option value="AEII">AEII</option>
               </select>
-            </div>
+            </div> */}
 
+            {/* Heure de sortie */}
             <div>
               <label className="block mb-1 font-medium">Heure de sortie</label>
               <input
@@ -144,6 +205,7 @@ export default function EmpruntFormModal({ isOpen, onClose, onEmpruntAdded }) {
               />
             </div>
 
+            {/* Matériel */}
             <div>
               <label className="block mb-1 font-medium">Matériel</label>
               <select
@@ -163,11 +225,24 @@ export default function EmpruntFormModal({ isOpen, onClose, onEmpruntAdded }) {
             </div>
           </div>
 
+          {/* Informations de l'étudiant sélectionné */}
+          {form.matricule && (
+            <div className="mb-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+              <h3 className="font-semibold text-blue-800 mb-2">Étudiant sélectionné :</h3>
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <div><span className="font-medium">Matricule:</span> {form.matricule}</div>
+                <div><span className="font-medium">Nom:</span> {form.prenoms}</div>
+                <div><span className="font-medium">Niveau:</span> {form.niveau}</div>
+                <div><span className="font-medium">Parcours:</span> {form.parcours}</div>
+              </div>
+            </div>
+          )}
+
           <button
             type="submit"
-            className="mt-4 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-800"
+            className="mt-4 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-800 transition duration-200"
           >
-            Enregistrer
+            Enregistrer l'emprunt
           </button>
         </form>
       </div>

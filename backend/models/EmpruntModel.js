@@ -4,7 +4,8 @@ const empruntSchema = new mongoose.Schema(
   {
     matricule: { type: String, required: true },
     prenoms: { type: String, required: true },
-    date: { type: Date, required: true },
+    dateEmprunt: { type: Date, required: true }, // Renommé de 'date' à 'dateEmprunt'
+    dateRetour: { type: Date }, // Nouveau champ pour la date de retour
     niveau: { type: String, required: true },
     parcours: { type: String, required: true },
     heureSortie: { type: String, required: true },

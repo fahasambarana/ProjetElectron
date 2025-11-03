@@ -160,25 +160,34 @@ function StudentList() {
     // Filtre par niveau
     if (filters.niveau) {
       filtered = filtered.filter(student => 
-        student.Niveau.toLowerCase().includes(filters.niveau.toLowerCase())
+        student.Niveau && student.Niveau.toLowerCase() === filters.niveau.toLowerCase()
       );
     }
 
     // Filtre par parcours
     if (filters.parcours) {
       filtered = filtered.filter(student => 
-        student.Parcours.toLowerCase().includes(filters.parcours.toLowerCase())
+        student.Parcours && student.Parcours.toLowerCase() === filters.parcours.toLowerCase()
       );
     }
 
-    // Filtre de recherche globale
+    // Filtre de recherche globale - CORRIGÉ
     if (filters.search) {
-      const searchTerm = filters.search.toLowerCase();
-      filtered = filtered.filter(student => 
-        student.Matricule.toLowerCase().includes(searchTerm) ||
-        student.Nom_et_Prenoms.toLowerCase().includes(searchTerm) ||
-        student.Telephone.toLowerCase().includes(searchTerm)
-      );
+      const searchTerm = filters.search.toLowerCase().trim();
+      filtered = filtered.filter(student => {
+        // Vérifier si l'étudiant a les propriétés nécessaires
+        if (!student) return false;
+        
+        const matricule = student.Matricule ? student.Matricule.toLowerCase() : '';
+        const nomPrenoms = student.Nom_et_Prenoms ? student.Nom_et_Prenoms.toLowerCase() : '';
+        const telephone = student.Telephone ? student.Telephone.toLowerCase() : '';
+        
+        return (
+          matricule.includes(searchTerm) ||
+          nomPrenoms.includes(searchTerm) ||
+          telephone.includes(searchTerm)
+        );
+      });
     }
 
     // Trier les étudiants filtrés par niveau
@@ -400,7 +409,7 @@ function StudentList() {
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-transparent text-sm"
                 >
                   <option value="">Tous les niveaux</option>
-                  {niveauOrder.map(niveau => (
+                  {getUniqueValues('Niveau').map(niveau => (
                     <option key={niveau} value={niveau}>{niveau}</option>
                   ))}
                 </select>
@@ -578,7 +587,7 @@ function StudentList() {
                   onChange={handleFormChange}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                   required
-                  disabled={!!editingMatricule}
+                  
                 />
               </div>
 
@@ -602,7 +611,7 @@ function StudentList() {
                   value={formData.Telephone}
                   onChange={handleFormChange}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                  required
+                
                 />
               </div>
 

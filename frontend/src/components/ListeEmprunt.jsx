@@ -25,6 +25,39 @@ export default function EmpruntList() {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
   const [exporting, setExporting] = useState(false);
+  const [showDateConfirmation, setShowDateConfirmation] = useState(null);
+
+  // Fonction pour extraire seulement le nom de famille
+  const getNomOnly = (nomComplet) => {
+    if (!nomComplet) return "";
+    
+    // Supprimer les parties entre parenthèses (ex: (Monsieur))
+    let nomSansParentheses = nomComplet.replace(/\([^)]*\)/g, '').trim();
+    
+    // Séparer par espace
+    const parties = nomSansParentheses.split(' ');
+    
+    // Prendre le dernier élément comme nom de famille
+    const nom = parties[parties.length - 1] || nomComplet;
+    
+    // Convertir en minuscules puis mettre seulement la première lettre en majuscule
+    return nom.charAt(0).toUpperCase() + nom.slice(1).toLowerCase();
+  };
+
+  // Fonction pour formater la date
+  const formatDate = (dateString) => {
+    if (!dateString) return "-";
+    return new Date(dateString).toLocaleDateString('fr-FR');
+  };
+
+  // Fonction pour obtenir la date et l'heure actuelles
+  const getCurrentDateTime = () => {
+    const now = new Date();
+    return {
+      date: now.toLocaleDateString('fr-FR'),
+      time: now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+    };
+  };
 
   const fetchEmprunts = async () => {
     try {
@@ -35,7 +68,7 @@ export default function EmpruntList() {
 
       if (Array.isArray(empruntsData)) {
         const sortedEmprunts = empruntsData.sort(
-          (a, b) => new Date(b.date) - new Date(a.date)
+          (a, b) => new Date(b.dateEmprunt || b.date) - new Date(a.dateEmprunt || a.date)
         );
         setEmprunts(sortedEmprunts);
       } else {
@@ -72,20 +105,37 @@ export default function EmpruntList() {
     setShowUpdateModal(true);
   };
 
-  const handleRenduClick = async (empruntId) => {
+  const handleRenduClick = (empruntId) => {
+    const currentDateTime = getCurrentDateTime();
+    setShowDateConfirmation({
+      id: empruntId,
+      date: currentDateTime.date,
+      time: currentDateTime.time
+    });
+  };
+
+  const confirmRendu = async () => {
+    if (!showDateConfirmation) return;
+
     try {
       const res = await axios.put(
-        `http://localhost:5000/api/emprunts/rendu/${empruntId}`,
-        { heureEntree: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) }
+        `http://localhost:5000/api/emprunts/rendu/${showDateConfirmation.id}`,
+        { heureEntree: showDateConfirmation.time }
       );
       
       const updatedEmprunt = res.data.data || res.data;
-      setEmprunts(prev => prev.map(e => e._id === empruntId ? updatedEmprunt : e));
+      setEmprunts(prev => prev.map(e => e._id === showDateConfirmation.id ? updatedEmprunt : e));
+      setShowDateConfirmation(null);
       
     } catch (err) {
       console.error("Erreur:", err);
       alert(err.response?.data?.message || "Impossible de marquer le matériel rendu");
+      setShowDateConfirmation(null);
     }
+  };
+
+  const cancelRendu = () => {
+    setShowDateConfirmation(null);
   };
 
   const handleDeleteClick = async (empruntId) => {
@@ -131,14 +181,13 @@ export default function EmpruntList() {
         30
       );
 
-      // Préparer les données du tableau (triées par date décroissante)
+      // Préparer les données du tableau
       const tableData = filteredEmprunts.map((emprunt) => [
         emprunt.matricule,
-        emprunt.prenoms,
-        new Date(emprunt.date).toLocaleDateString("fr-FR"),
-        emprunt.materiel && emprunt.materiel.name
-          ? emprunt.materiel.name
-          : "N/A",
+        getNomOnly(emprunt.prenoms),
+        formatDate(emprunt.dateEmprunt || emprunt.date),
+        formatDate(emprunt.dateRetour),
+        emprunt.materiel && emprunt.materiel.name ? emprunt.materiel.name : "N/A",
         emprunt.heureSortie,
         emprunt.heureEntree || "-",
         emprunt.heureEntree ? "Rendu" : "En cours",
@@ -149,8 +198,9 @@ export default function EmpruntList() {
         head: [
           [
             "Matricule",
-            "Prénoms",
-            "Date",
+            "Nom",
+            "Date Emprunt",
+            "Date Retour",
             "Matériel",
             "Heure Sortie",
             "Heure Entrée",
@@ -174,17 +224,18 @@ export default function EmpruntList() {
           fillColor: [248, 250, 252],
         },
         columnStyles: {
-          0: { cellWidth: 25 },
-          1: { cellWidth: 35 },
-          2: { cellWidth: 25 },
-          3: { cellWidth: 30 },
-          4: { cellWidth: 20 },
-          5: { cellWidth: 20 },
-          6: { cellWidth: 20 },
+          0: { cellWidth: 20 },
+          1: { cellWidth: 20 },
+          2: { cellWidth: 20 },
+          3: { cellWidth: 20 },
+          4: { cellWidth: 25 },
+          5: { cellWidth: 18 },
+          6: { cellWidth: 18 },
+          7: { cellWidth: 18 },
         },
         didDrawCell: (data) => {
           // Colorer les cellules de statut
-          if (data.column.index === 6 && data.cell.section === "body") {
+          if (data.column.index === 7 && data.cell.section === "body") {
             const status = data.cell.raw;
             if (status === "Rendu") {
               doc.setTextColor(5, 150, 105); // Vert
@@ -236,11 +287,50 @@ export default function EmpruntList() {
 
       return matchesSearch && matchesStatus;
     })
-    // Tri supplémentaire pour s'assurer que les résultats filtrés sont aussi triés par date décroissante
-    .sort((a, b) => new Date(b.date) - new Date(a.date));
+    .sort((a, b) => new Date(b.dateEmprunt || b.date) - new Date(a.dateEmprunt || a.date));
 
   return (
     <div className="max-w-7xl mx-auto p-6 bg-white rounded-xl shadow-md border border-gray-100">
+      {/* Modal de confirmation de rendu */}
+      {showDateConfirmation && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg shadow-xl max-w-md w-full mx-4">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">
+              Confirmer le retour
+            </h3>
+            
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+              <div className="text-sm text-blue-800">
+                <p className="font-medium">Date et heure de retour :</p>
+                <p className="text-lg font-bold mt-1">
+                  {showDateConfirmation.date} à {showDateConfirmation.time}
+                </p>
+              </div>
+            </div>
+
+            <p className="text-gray-600 mb-4">
+              Êtes-vous sûr de vouloir marquer cet emprunt comme rendu avec la date et l'heure actuelles ?
+            </p>
+
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={cancelRendu}
+                className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition duration-200"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={confirmRendu}
+                className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition duration-200 flex items-center"
+              >
+                <CheckCircle size={18} className="mr-2" />
+                Confirmer le retour
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
         <div>
           <h2 className="text-2xl font-bold text-gray-800">
@@ -317,99 +407,109 @@ export default function EmpruntList() {
           {error}
         </div>
       ) : (
-        <div className="overflow-x-auto border border-gray-200 rounded-lg shadow-sm">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Matricule
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Prénoms
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Date
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Matériel
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Heure Sortie
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Heure Entrée
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Statut
-                </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {filteredEmprunts.map((e) => (
-                <tr key={e._id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap font-medium text-gray-900">
-                    {e.matricule}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">{e.prenoms}</td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {new Date(e.date).toLocaleDateString()}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {e.materiel && e.materiel.name}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {e.heureSortie}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {e?.heureEntree || "-"}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {e.heureEntree ? (
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                        <CheckCircle size={14} className="mr-1" />
-                        Rendu
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                        <Clock size={14} className="mr-1" />
-                        En cours
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
-                    {!e?.heureEntree && (
-                      <button
-                        onClick={() => handleRenduClick(e._id)}
-                        className="text-green-600 hover:text-green-900 p-1.5 rounded-md hover:bg-green-50"
-                        title="Marquer comme rendu"
-                      >
-                        <CheckCircle size={18} />
-                      </button>
-                    )}
-                    <button
-                      onClick={() => handleEditClick(e)}
-                      className="text-blue-600 hover:text-blue-900 p-1.5 rounded-md hover:bg-blue-50"
-                      title="Modifier"
-                    >
-                      <Edit size={18} />
-                    </button>
-                    <button
-                      onClick={() => handleDeleteClick(e._id)}
-                      className="text-red-600 hover:text-red-900 p-1.5 rounded-md hover:bg-red-50"
-                      title="Supprimer"
-                    >
-                      <Trash2 size={18} />
-                    </button>
-                  </td>
+        <div className="border border-gray-200 rounded-lg shadow-sm overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200 text-xs">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-2 py-2 text-left font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                    Matricule
+                  </th>
+                  <th className="px-2 py-2 text-left font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                    Nom
+                  </th>
+                  <th className="px-2 py-2 text-left font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                    Date Emp.
+                  </th>
+                  <th className="px-2 py-2 text-left font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                    Date Ret.
+                  </th>
+                  <th className="px-2 py-2 text-left font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                    Matériel
+                  </th>
+                  <th className="px-2 py-2 text-left font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                    H. Sortie
+                  </th>
+                  <th className="px-2 py-2 text-left font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                    H. Entrée
+                  </th>
+                  <th className="px-2 py-2 text-left font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                    Statut
+                  </th>
+                  <th className="px-2 py-2 text-right font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                    Actions
+                  </th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {filteredEmprunts.map((e) => (
+                  <tr key={e._id} className="hover:bg-gray-50">
+                    <td className="px-2 py-2 whitespace-nowrap font-medium text-gray-900">
+                      {e.matricule}
+                    </td>
+                    <td className="px-2 py-2 whitespace-nowrap">
+                      {getNomOnly(e.prenoms)}
+                    </td>
+                    <td className="px-2 py-2 whitespace-nowrap">
+                      {formatDate(e.dateEmprunt || e.date)}
+                    </td>
+                    <td className="px-2 py-2 whitespace-nowrap">
+                      {formatDate(e.dateRetour)}
+                    </td>
+                    <td className="px-2 py-2 whitespace-nowrap max-w-[120px] truncate" title={e.materiel && e.materiel.name}>
+                      {e.materiel && e.materiel.name}
+                    </td>
+                    <td className="px-2 py-2 whitespace-nowrap">
+                      {e.heureSortie}
+                    </td>
+                    <td className="px-2 py-2 whitespace-nowrap">
+                      {e?.heureEntree || "-"}
+                    </td>
+                    <td className="px-2 py-2 whitespace-nowrap">
+                      {e.heureEntree ? (
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                          <CheckCircle size={12} className="mr-0.5" />
+                          Rendu
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                          <Clock size={12} className="mr-0.5" />
+                          En cours
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-2 py-2 whitespace-nowrap text-right space-x-1">
+                      {!e?.heureEntree && (
+                        <button
+                          onClick={() => handleRenduClick(e._id)}
+                          className="text-green-600 hover:text-green-900 p-1 rounded hover:bg-green-50 inline-flex items-center"
+                          title="Marquer comme rendu"
+                        >
+                          <CheckCircle size={14} />
+                        </button>
+                      )}
+                      <button
+                        onClick={() => handleEditClick(e)}
+                        className="text-blue-600 hover:text-blue-900 p-1 rounded hover:bg-blue-50 inline-flex items-center"
+                        title="Modifier"
+                      >
+                        <Edit size={14} />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteClick(e._id)}
+                        className="text-red-600 hover:text-red-900 p-1 rounded hover:bg-red-50 inline-flex items-center"
+                        title="Supprimer"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
           {filteredEmprunts.length === 0 && (
-            <div className="text-center py-8 text-gray-500">
+            <div className="text-center py-8 text-gray-500 text-sm">
               Aucun emprunt trouvé
             </div>
           )}
