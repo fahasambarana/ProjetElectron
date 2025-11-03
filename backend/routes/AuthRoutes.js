@@ -3,7 +3,7 @@ const express = require('express');
 const User = require('../models/UserModel')
 const router = express.Router();
 const { register, login } = require('../controllers/authController');
-const authMiddleware = require("../middlewares/AuthMiddleware")
+const { authMiddleware } = require("../middlewares/AuthMiddleware"); // Changement ici
 
 router.post('/register', register);
 router.post('/login', login);
@@ -16,6 +16,5 @@ router.get("/me", authMiddleware, async (req, res) => {
     res.status(500).json({ message: "Erreur serveur", error: error.message });
   }
 });
-
 
 module.exports = router;

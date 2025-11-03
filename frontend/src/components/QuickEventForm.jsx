@@ -7,8 +7,8 @@ import { useNavigate } from "react-router-dom";
 export function QuickEventForm({ selectedDate, onClose, onEventAdded }) {
   if (!selectedDate) return null;
 
-  const parcoursOptions = ["GL", "AEII"];
-  const niveauOptions = ["L1", "L2", "L3", "M1", "M2"];
+  const parcoursOptions = ["GL", "AEII", "tout "];
+  const niveauOptions = ["L1", "L2", "L3", "M1", "M2","tout"];
   const groupeOptions = ["", "Groupe 1", "Groupe 2"]; // <-- nouveau champ
   const navigate = useNavigate();
 

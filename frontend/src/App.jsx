@@ -19,9 +19,8 @@ import { useAuth, AuthProvider } from "./context/useContext";
 import ListeEmprunts from "./components/ListeEmprunt";
 import PrivateRoute from "./components/PrivateRoutes";
 import StudentList from "./components/StudentsList";
-
-// Composant PrivateRoute vérifie l'authentification
-
+import StudentLogin from "./components/StudentLogin";
+import StudentDashboard from "./components/StudentDashboard"; // Créez ce composant
 
 function App() {
   return (
@@ -31,8 +30,12 @@ function App() {
           {/* Routes publiques */}
           <Route path="/login" element={<LoginForm />} />
           <Route path="/register" element={<RegisterForm />} />
-
-          {/* Routes privées protégées */}
+          <Route path="/student" element={<StudentLogin />} />
+          
+          {/* Routes étudiantes */}
+          <Route path="/student/dashboard" element={<StudentDashboard />} />
+          
+          {/* Routes admin protégées */}
           <Route
             path="/dashboard"
             element={
@@ -92,7 +95,8 @@ function App() {
                 </Layout>
               </PrivateRoute>
             }
-          /><Route
+          />
+          <Route
             path="/liststudents"
             element={
               <PrivateRoute>
@@ -113,8 +117,8 @@ function App() {
             }
           />
 
-          {/* Route par défaut */}
-          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          {/* Route par défaut - Redirige vers student au lieu de dashboard */}
+          <Route path="*" element={<Navigate to="/student" replace />} />
         </Routes>
       </Router>
     </AuthProvider>

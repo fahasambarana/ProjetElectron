@@ -15,6 +15,7 @@ function EditModal({ isOpen, eventData, onClose, onSave, onDelete }) {
   });
 
   // Options pour les sélecteurs
+
   const parcoursOptions = ["GL", "AEII"];
   const niveauOptions = ["L1", "L2", "L3", "M1", "M2"];
   const groupeOptions = ["", "Groupe 1", "Groupe 2",];
