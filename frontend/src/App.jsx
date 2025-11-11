@@ -21,6 +21,7 @@ import PrivateRoute from "./components/PrivateRoutes";
 import StudentList from "./components/StudentsList";
 import StudentLogin from "./components/StudentLogin";
 import StudentDashboard from "./components/StudentDashboard"; // Créez ce composant
+import Notifications from "./components/Notifications";
 
 function App() {
   return (
@@ -72,6 +73,15 @@ function App() {
               <PrivateRoute>
                 <Layout>
                   <EmploiDuTemps />
+                </Layout>
+              </PrivateRoute>
+            }
+          /><Route
+            path="/notif"
+            element={
+              <PrivateRoute>
+                <Layout>
+                  <Notifications />
                 </Layout>
               </PrivateRoute>
             }

@@ -7,6 +7,8 @@ const eventRoutes = require('./routes/eventRoutes')
 const empruntRoutes = require('./routes/empruntRoutes');
 const authRoutes = require('./routes/AuthRoutes');
 const studentRoutes = require('./routes/studentRoutes');
+const alertRoutes = require('./routes/alertRoutes');
+require('./cron/alertCron');
 
 
 dotenv.config();
@@ -27,6 +29,7 @@ app.use("/api/events", eventRoutes);
 app.use("/api/emprunts", empruntRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/students', studentRoutes);
+app.use('/api/alertes', alertRoutes);
 
 
 app.get('/', (req, res) => res.send('API stocks fonctionne'));

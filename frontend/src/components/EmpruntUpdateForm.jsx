@@ -6,7 +6,8 @@ export default function EmpruntUpdateModal({ isOpen, onClose, emprunt, onEmprunt
   const [form, setForm] = useState({
     matricule: "",
     prenoms: "",
-    date: "",
+    dateEmprunt: "",
+    dateRetourEffective: "", // 🔥 CHANGEMENT : Utiliser dateRetourEffective
     niveau: "",
     parcours: "",
     heureSortie: "",
@@ -15,17 +16,20 @@ export default function EmpruntUpdateModal({ isOpen, onClose, emprunt, onEmprunt
   });
   const [materiels, setMateriels] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   // Charger les données de l'emprunt et la liste des matériels
   useEffect(() => {
     if (isOpen && emprunt) {
       setLoading(true);
+      setError("");
       
-      // Charger les données de l'emprunt
+      // 🔥 CORRECTION : Utiliser dateRetourEffective pour la date de retour
       setForm({
         matricule: emprunt.matricule || "",
         prenoms: emprunt.prenoms || "",
-        date: emprunt.date ? new Date(emprunt.date).toISOString().split('T')[0] : "",
+        dateEmprunt: emprunt.dateEmprunt ? new Date(emprunt.dateEmprunt).toISOString().split('T')[0] : "",
+        dateRetourEffective: emprunt.dateRetourEffective ? new Date(emprunt.dateRetourEffective).toISOString().split('T')[0] : "",
         niveau: emprunt.niveau || "",
         parcours: emprunt.parcours || "",
         heureSortie: emprunt.heureSortie || "",
@@ -36,10 +40,12 @@ export default function EmpruntUpdateModal({ isOpen, onClose, emprunt, onEmprunt
       // Charger la liste des matériels
       axios.get("http://localhost:5000/api/stocks")
         .then((res) => {
-          setMateriels(res.data);
+          const materielsData = res.data.data || res.data;
+          setMateriels(Array.isArray(materielsData) ? materielsData : []);
         })
         .catch(err => {
           console.error("Erreur lors du chargement des matériels:", err);
+          setError("Erreur lors du chargement des matériels");
         })
         .finally(() => {
           setLoading(false);
@@ -54,12 +60,39 @@ export default function EmpruntUpdateModal({ isOpen, onClose, emprunt, onEmprunt
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
+    setError("");
+
     try {
-      const res = await axios.put(`http://localhost:5000/api/emprunts/${emprunt._id}`, form);
-      onEmpruntUpdated(res.data);
-      onClose();
+      const payload = {
+        matricule: form.matricule,
+        prenoms: form.prenoms,
+        dateEmprunt: form.dateEmprunt,
+        dateRetourEffective: form.dateRetourEffective || undefined, // 🔥 CHANGEMENT
+        niveau: form.niveau,
+        parcours: form.parcours,
+        heureSortie: form.heureSortie,
+        heureEntree: form.heureEntree || undefined,
+        materiel: form.materiel,
+      };
+
+      const res = await axios.put(
+        `http://localhost:5000/api/emprunts/${emprunt._id}`, 
+        payload
+      );
+
+      if (res.data.success) {
+        onEmpruntUpdated(res.data.data || res.data);
+        onClose();
+      } else {
+        setError(res.data.message || "Erreur lors de la modification");
+      }
     } catch (err) {
-      alert(err.response?.data?.message || "Erreur lors de la modification de l'emprunt");
+      console.error("Erreur modification emprunt:", err);
+      setError(
+        err.response?.data?.message || 
+        err.response?.data?.error || 
+        "Erreur lors de la modification de l'emprunt"
+      );
     } finally {
       setLoading(false);
     }
@@ -74,15 +107,27 @@ export default function EmpruntUpdateModal({ isOpen, onClose, emprunt, onEmprunt
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <div>
             <h2 className="text-xl font-bold text-gray-800">Modifier l'Emprunt</h2>
-            <p className="text-gray-500 text-sm mt-1">Modifier les informations de l'emprunt</p>
+            <p className="text-gray-500 text-sm mt-1">
+              Matricule: <span className="font-medium">{emprunt.matricule}</span>
+            </p>
           </div>
           <button
             onClick={onClose}
             className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            disabled={loading}
           >
             <X size={20} className="text-gray-500" />
           </button>
         </div>
+
+        {/* Message d'erreur */}
+        {error && (
+          <div className="mx-6 mt-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg">
+            <div className="flex items-center">
+              <span className="text-sm">{error}</span>
+            </div>
+          </div>
+        )}
 
         {/* Formulaire */}
         <form onSubmit={handleSubmit} className="p-6">
@@ -119,19 +164,36 @@ export default function EmpruntUpdateModal({ isOpen, onClose, emprunt, onEmprunt
               />
             </div>
 
-            {/* Date */}
+            {/* Date d'emprunt */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Date <span className="text-red-500">*</span>
+                Date d'emprunt <span className="text-red-500">*</span>
               </label>
               <input
                 type="date"
-                name="date"
-                value={form.date}
+                name="dateEmprunt"
+                value={form.dateEmprunt}
                 onChange={handleChange}
                 required
                 className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
               />
+            </div>
+
+            {/* 🔥 CORRECTION : Date de retour effective */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Date de retour
+              </label>
+              <input
+                type="date"
+                name="dateRetourEffective"
+                value={form.dateRetourEffective}
+                onChange={handleChange}
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Date réelle à laquelle le matériel a été rendu
+              </p>
             </div>
 
             {/* Niveau */}
@@ -170,6 +232,9 @@ export default function EmpruntUpdateModal({ isOpen, onClose, emprunt, onEmprunt
                 <option value="">-- Choisir un parcours --</option>
                 <option value="GL">GL</option>
                 <option value="AEII">AEII</option>
+                <option value="IIR">IIR</option>
+                <option value="IMI">IMI</option>
+                <option value="Other">Autre</option>
               </select>
             </div>
 
@@ -202,7 +267,7 @@ export default function EmpruntUpdateModal({ isOpen, onClose, emprunt, onEmprunt
                 placeholder="HH:MM"
               />
               <p className="text-xs text-gray-500 mt-1">
-                Laissez vide si le matériel n'est pas encore rendu
+                Renseignez seulement si le matériel est rendu
               </p>
             </div>
 
@@ -222,7 +287,8 @@ export default function EmpruntUpdateModal({ isOpen, onClose, emprunt, onEmprunt
                 <option value="">-- Choisir un matériel --</option>
                 {materiels.map((m) => (
                   <option key={m._id} value={m._id}>
-                    {m.name} {m.stock !== undefined && `(Stock: ${m.stock})`}
+                    {m.name || m.designation || m.nom} 
+                    {m.stock !== undefined && ` (Stock: ${m.stock})`}
                   </option>
                 ))}
               </select>
@@ -232,10 +298,10 @@ export default function EmpruntUpdateModal({ isOpen, onClose, emprunt, onEmprunt
             </div>
           </div>
 
-          {/* Statut actuel */}
+          {/* 🔥 CORRECTION : Section statut simplifiée */}
           <div className="mb-6 p-4 bg-gray-50 rounded-lg">
             <h3 className="text-sm font-medium text-gray-700 mb-2">Statut actuel</h3>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 mb-2">
               {emprunt.heureEntree ? (
                 <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
                   <span className="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
@@ -247,12 +313,30 @@ export default function EmpruntUpdateModal({ isOpen, onClose, emprunt, onEmprunt
                   En cours d'emprunt
                 </span>
               )}
-              <span className="text-xs text-gray-500">
-                {emprunt.heureEntree 
-                  ? `Rendu le ${new Date(emprunt.date).toLocaleDateString('fr-FR')} à ${emprunt.heureEntree}`
-                  : `Emprunté le ${new Date(emprunt.date).toLocaleDateString('fr-FR')}`
-                }
-              </span>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs text-gray-600">
+              <div>
+                <span className="font-medium">Date d'emprunt:</span>{' '}
+                {new Date(emprunt.dateEmprunt).toLocaleDateString('fr-FR')}
+              </div>
+              
+              {emprunt.dateRetourEffective && (
+                <div>
+                  <span className="font-medium text-green-600">Date de retour:</span>{' '}
+                  {new Date(emprunt.dateRetourEffective).toLocaleDateString('fr-FR')}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Informations importantes */}
+          <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <h3 className="text-sm font-medium text-blue-800 mb-2">📝 Informations importantes</h3>
+            <div className="text-xs text-blue-700 space-y-1">
+              <p>• La <strong>date de retour</strong> correspond à la date réelle de retour du matériel</p>
+              <p>• Si vous remplissez la date de retour, n'oubliez pas de remplir aussi l'heure d'entrée</p>
+              <p>• Si vous changez le matériel, le stock sera automatiquement ajusté</p>
             </div>
           </div>
 
@@ -261,7 +345,8 @@ export default function EmpruntUpdateModal({ isOpen, onClose, emprunt, onEmprunt
             <button
               type="button"
               onClick={onClose}
-              className="px-6 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+              disabled={loading}
+              className="px-6 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Annuler
             </button>
