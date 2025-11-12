@@ -1,5 +1,7 @@
 const mongoose = require("mongoose");
 const Stock = require("../models/StockModel");
+const fs = require("fs");
+const path = require("path");
 
 // Compter tous les stocks
 exports.countStocks = async (req, res) => {
@@ -45,24 +47,47 @@ exports.getStocks = async (req, res) => {
   }
 };
 
-// Créer un nouveau stock
+// ✅ CORRECTION : Créer un nouveau stock avec le nouveau modèle
 exports.createStock = async (req, res) => {
   try {
-    const { name, description, stock, seuil } = req.body;
+    console.log("📥 Données reçues:", req.body);
+    console.log("📸 Fichier reçu:", req.file);
+
+    // ✅ CORRECTION : Extraire les champs du nouveau modèle
+    const { 
+      name, 
+      type, 
+      stock, 
+      threshold, 
+      specifications = "{}" 
+    } = req.body;
 
     // Validation des champs obligatoires
-    if (!name || stock === undefined) {
+    if (!name || !type || stock === undefined) {
       return res.status(400).json({
         success: false,
-        message: "Nom et stock sont obligatoires",
+        message: "Nom, type et stock sont obligatoires",
       });
     }
 
+    // ✅ CORRECTION : Gérer les spécifications
+    let specs = {};
+    try {
+      specs = specifications ? JSON.parse(specifications) : {};
+    } catch (parseError) {
+      console.warn("Erreur parsing specifications:", parseError);
+      specs = {};
+    }
+
+    const photo = req.file ? req.file.path : null;
+
     const nouveauStock = await Stock.create({
       name,
-      description,
-      stock,
-      seuil: seuil || 5,
+      type,
+      stock: Number(stock),
+      threshold: Number(threshold) || 0,
+      specifications: specs,
+      photo
     });
 
     res.status(201).json({
@@ -72,6 +97,15 @@ exports.createStock = async (req, res) => {
     });
   } catch (err) {
     console.error("Erreur création stock:", err);
+    
+    if (err.name === 'ValidationError') {
+      return res.status(400).json({
+        success: false,
+        message: "Données de validation invalides",
+        errors: err.errors
+      });
+    }
+    
     res.status(500).json({
       success: false,
       message: "Erreur lors de la création du stock",
@@ -121,11 +155,14 @@ exports.getStockById = async (req, res) => {
   }
 };
 
-// Mettre à jour un stock
+// ✅ CORRECTION : Mettre à jour un stock avec le nouveau modèle
 exports.updateStock = async (req, res) => {
   try {
+    console.log("📥 Mise à jour stock - Body:", req.body);
+    console.log("📥 Mise à jour stock - File:", req.file);
+    console.log("📥 Mise à jour stock - Params:", req.params);
+
     const { id } = req.params;
-    const { name, description, stock, seuil } = req.body;
 
     if (!id) {
       return res.status(400).json({
@@ -149,9 +186,47 @@ exports.updateStock = async (req, res) => {
       });
     }
 
+    // ✅ CORRECTION : Extraire avec valeurs par défaut
+    const { 
+      name = existingStock.name, 
+      type = existingStock.type, 
+      stock = existingStock.stock, 
+      threshold = existingStock.threshold, 
+      specifications = JSON.stringify(existingStock.specifications)
+    } = req.body || {};
+
+    // ✅ CORRECTION : Gérer les spécifications
+    let specs = existingStock.specifications;
+    try {
+      if (specifications && specifications !== "{}") {
+        specs = JSON.parse(specifications);
+      }
+    } catch (parseError) {
+      console.warn("Erreur parsing specifications:", parseError);
+      // Garder les anciennes spécifications en cas d'erreur
+    }
+
+    // ✅ CORRECTION : Si une nouvelle image est uploadée → supprimer l'ancienne
+    if (req.file && existingStock.photo) {
+      // Supprimer l'ancienne photo du système de fichiers
+      const oldPhotoPath = path.join(__dirname, '..', existingStock.photo);
+      if (fs.existsSync(oldPhotoPath)) {
+        fs.unlinkSync(oldPhotoPath);
+      }
+    }
+
+    const updateData = {
+      name,
+      type,
+      stock: Number(stock),
+      threshold: Number(threshold),
+      specifications: specs,
+      ...(req.file && { photo: req.file.path }) // Mettre à jour la photo seulement si nouvelle
+    };
+
     const updatedStock = await Stock.findByIdAndUpdate(
       id,
-      { name, description, stock, seuil },
+      updateData,
       { new: true, runValidators: true }
     );
 
@@ -161,7 +236,16 @@ exports.updateStock = async (req, res) => {
       data: updatedStock,
     });
   } catch (err) {
-    console.error("Erreur modification stock:", err);
+    console.error("❌ Erreur modification stock:", err);
+    
+    if (err.name === 'ValidationError') {
+      return res.status(400).json({
+        success: false,
+        message: "Données de validation invalides",
+        errors: err.errors
+      });
+    }
+    
     res.status(500).json({
       success: false,
       message: "Erreur lors de la modification du stock",
@@ -197,6 +281,14 @@ exports.deleteStock = async (req, res) => {
       });
     }
 
+    // ✅ CORRECTION : Supprimer aussi la photo du système de fichiers
+    if (stock.photo) {
+      const photoPath = path.join(__dirname, '..', stock.photo);
+      if (fs.existsSync(photoPath)) {
+        fs.unlinkSync(photoPath);
+      }
+    }
+
     await Stock.findByIdAndDelete(id);
 
     res.json({
@@ -228,6 +320,7 @@ exports.searchStocks = async (req, res) => {
     const stocks = await Stock.find({
       $or: [
         { name: { $regex: search, $options: 'i' } },
+        { type: { $regex: search, $options: 'i' } },
         { description: { $regex: search, $options: 'i' } }
       ]
     }).sort({ createdAt: -1 });
@@ -251,19 +344,40 @@ exports.searchStocks = async (req, res) => {
 exports.getStats = async (req, res) => {
   try {
     const totalStocks = await Stock.countDocuments();
+    
+    // ✅ CORRECTION : Adapter les statistiques au nouveau modèle
     const stocksFaibles = await Stock.countDocuments({
-      stock: { $lte: 5 } // Stocks à 5 ou moins
+      $expr: { $lte: ["$stock", "$threshold"] },
+      stock: { $gt: 0 }
     });
+    
+    const stocksRupture = await Stock.countDocuments({
+      stock: 0
+    });
+    
     const stocksDisponibles = await Stock.countDocuments({
       stock: { $gt: 0 }
     });
+
+    // Statistiques par type
+    const statsByType = await Stock.aggregate([
+      {
+        $group: {
+          _id: "$type",
+          count: { $sum: 1 },
+          totalStock: { $sum: "$stock" }
+        }
+      }
+    ]);
 
     res.json({
       success: true,
       data: {
         totalStocks,
         stocksFaibles,
+        stocksRupture,
         stocksDisponibles,
+        statsByType
       },
     });
   } catch (err) {

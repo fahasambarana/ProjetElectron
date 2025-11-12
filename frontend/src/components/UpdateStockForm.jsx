@@ -16,6 +16,9 @@ const UpdateStockForm = ({ isOpen, onClose, onStockUpdated, stockId }) => {
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  
+  // 🎯 NOUVEAU: État pour gérer la spécification en cours d'édition
+  const [editingSpecKey, setEditingSpecKey] = useState(null); 
 
   useEffect(() => {
     const fetchStock = async () => {
@@ -26,14 +29,9 @@ const UpdateStockForm = ({ isOpen, onClose, onStockUpdated, stockId }) => {
       }
       setLoading(true);
       try {
-        console.log("🔄 Chargement du stock ID:", stockId); // Debug
         const res = await api.get(`/stocks/${stockId}`);
-        console.log("📦 Données reçues:", res.data); // Debug
-        
         const stock = res.data;
-        
-        // ✅ CORRECTION : Vérifier la structure des données
-        const stockData = stock.data || stock; // Support des deux structures
+        const stockData = stock.data || stock;
         
         setFormData({
           name: stockData.name || "",
@@ -46,16 +44,8 @@ const UpdateStockForm = ({ isOpen, onClose, onStockUpdated, stockId }) => {
         setCurrentPhoto(stockData.photo || null);
         setErrors({});
         
-        console.log("✅ Données chargées dans le formulaire:", { // Debug
-          name: stockData.name,
-          type: stockData.type,
-          stock: stockData.stock,
-          specifications: stockData.specifications
-        });
-        
       } catch (err) {
         console.error("❌ Erreur chargement stock:", err);
-        console.error("❌ Détails erreur:", err.response?.data); // Debug
         setErrors({ fetch: "Impossible de charger les données du stock" });
       } finally {
         setLoading(false);
@@ -63,7 +53,6 @@ const UpdateStockForm = ({ isOpen, onClose, onStockUpdated, stockId }) => {
     };
     
     if (isOpen && stockId) {
-      console.log("🎯 Modal ouvert, chargement du stock..."); // Debug
       fetchStock();
     } else {
       // Réinitialiser quand le modal est fermé
@@ -78,6 +67,7 @@ const UpdateStockForm = ({ isOpen, onClose, onStockUpdated, stockId }) => {
       setPhoto(null);
       setPhotoPreview(null);
       setNewSpec({ key: "", value: "" });
+      setEditingSpecKey(null); // Réinitialiser l'édition
     }
   }, [isOpen, stockId]);
 
@@ -93,13 +83,12 @@ const UpdateStockForm = ({ isOpen, onClose, onStockUpdated, stockId }) => {
       setFormData((prev) => ({ ...prev, [name]: value }));
     }
     
-    // Effacer l'erreur du champ lorsqu'il est modifié
     if (errors[name]) {
       setErrors((prev) => ({ ...prev, [name]: "" }));
     }
   };
 
-  // Gestion du fichier photo
+  // Gestion du fichier photo (inchangé)
   const handlePhotoChange = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -119,7 +108,7 @@ const UpdateStockForm = ({ isOpen, onClose, onStockUpdated, stockId }) => {
     }
   };
 
-  // Gestion des spécifications
+  // Ajout d'une spécification (inchangé)
   const handleAddSpec = () => {
     if (!newSpec.key.trim() || !newSpec.value.trim()) {
       setErrors((prev) => ({
@@ -141,13 +130,54 @@ const UpdateStockForm = ({ isOpen, onClose, onStockUpdated, stockId }) => {
     setErrors((prev) => ({ ...prev, spec: null }));
   };
 
-  const handleRemoveSpec = (key) => {
+  // ✅ CORRIGÉ: Suppression d'une spécification
+  const handleRemoveSpec = (keyToDelete) => {
+    // S'assurer que la clé en cours d'édition n'est pas celle que l'on supprime
+    if (editingSpecKey === keyToDelete) {
+        setEditingSpecKey(null);
+    }
+
     const updated = { ...formData.specifications };
-    delete updated[key];
+    delete updated[keyToDelete];
+    
     setFormData((prev) => ({ ...prev, specifications: updated }));
   };
+  
+  // 🎯 NOUVEAU: Gestion de la modification d'une spécification
+  const handleEditSpec = (originalKey, newKey, newValue) => {
+    // Valider la nouvelle clé et valeur
+    if (!newKey.trim() || !newValue.trim()) {
+        setErrors((prev) => ({
+            ...prev,
+            editSpec: "La clé et la valeur de la spécification doivent être renseignées.",
+        }));
+        return;
+    }
+    
+    // Si la clé a changé, on doit supprimer l'ancienne et ajouter la nouvelle
+    if (originalKey !== newKey.trim()) {
+      const updated = { ...formData.specifications };
+      delete updated[originalKey]; // Supprimer l'ancienne clé
+      updated[newKey.trim()] = newValue.trim(); // Ajouter la nouvelle clé/valeur
+      
+      setFormData((prev) => ({ ...prev, specifications: updated }));
+      setEditingSpecKey(null); // Fin de l'édition
+      return;
+    }
 
-  // Validation des champs
+    // Si seule la valeur a changé (la clé est la même)
+    setFormData((prev) => ({
+      ...prev,
+      specifications: {
+        ...prev.specifications,
+        [originalKey]: newValue.trim(),
+      },
+    }));
+    
+    setEditingSpecKey(null); // Fin de l'édition
+  };
+
+  // Validation des champs (inchangé)
   const validate = () => {
     const newErrors = {};
     if (!formData.name.trim()) newErrors.name = "Le nom du produit est requis";
@@ -172,10 +202,10 @@ const UpdateStockForm = ({ isOpen, onClose, onStockUpdated, stockId }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!validate()) return;
+    if (editingSpecKey) return setErrors({ submit: "Veuillez terminer l'édition de la spécification en cours." });
 
     try {
       setSubmitting(true);
-      console.log("📤 Envoi des données:", formData); // Debug
 
       const submitData = new FormData();
       submitData.append("name", formData.name);
@@ -188,27 +218,12 @@ const UpdateStockForm = ({ isOpen, onClose, onStockUpdated, stockId }) => {
         submitData.append("photo", photo);
       }
 
-      // Debug: Afficher le contenu de FormData
-      for (let [key, value] of submitData.entries()) {
-        console.log(`FormData ${key}:`, value);
-      }
-
-      const response = await api.put(`/stocks/${stockId}`, submitData, {
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
-      });
-
-      console.log("✅ Réponse mise à jour:", response.data); // Debug
-
+      // ✅ CORRECTION IMPORTANTE: Retirer le Content-Type. 
+      // Le navigateur doit définir automatiquement Content-Type: multipart/form-data
+      // car nous utilisons FormData, ce qui inclut la boundary nécessaire.
+      const response = await api.put(`/stocks/${stockId}`, submitData);
+      
       // Réinitialisation après succès
-      setFormData({
-        name: "",
-        type: "",
-        stock: "",
-        threshold: "",
-        specifications: {},
-      });
       setPhoto(null);
       setPhotoPreview(null);
       setNewSpec({ key: "", value: "" });
@@ -218,7 +233,6 @@ const UpdateStockForm = ({ isOpen, onClose, onStockUpdated, stockId }) => {
       onClose();
     } catch (err) {
       console.error("❌ Erreur mise à jour:", err);
-      console.error("❌ Détails erreur:", err.response?.data); // Debug
       setErrors({
         submit: err.response?.data?.message || "Erreur lors de la mise à jour du stock. Veuillez réessayer.",
       });
@@ -228,6 +242,7 @@ const UpdateStockForm = ({ isOpen, onClose, onStockUpdated, stockId }) => {
   };
 
   const handleClose = () => {
+    // ... réinitialisation des états
     setFormData({
       name: "",
       type: "",
@@ -239,17 +254,118 @@ const UpdateStockForm = ({ isOpen, onClose, onStockUpdated, stockId }) => {
     setPhotoPreview(null);
     setNewSpec({ key: "", value: "" });
     setErrors({});
+    setEditingSpecKey(null);
     onClose();
   };
 
-  // Fonction pour obtenir l'URL de la photo
+  // Fonction pour obtenir l'URL de la photo (inchangé)
   const getPhotoUrl = (photoPath) => {
     if (!photoPath) return null;
     if (photoPath.startsWith('http')) return photoPath;
-    return `http://localhost:5000/${photoPath}`;
+    // Assurez-vous que l'URL de base correspond à votre backend
+    return `http://localhost:5000/${photoPath}`; 
   };
 
   if (!isOpen) return null;
+
+  // 🎯 Composant interne pour la gestion de l'édition d'une spec
+  const EditableSpecItem = ({ initialKey, initialValue, onSave, onRemove }) => {
+    const [key, setKey] = useState(initialKey);
+    const [value, setValue] = useState(initialValue);
+
+    return (
+      <div className="flex items-center bg-yellow-50 px-3 py-2 rounded-lg text-sm border border-yellow-200">
+        <div className="flex-1 grid grid-cols-2 gap-2 mr-2">
+            <input
+                type="text"
+                value={key}
+                onChange={(e) => setKey(e.target.value)}
+                placeholder="Clé"
+                className="w-full bg-white border border-gray-300 px-2 py-1 rounded text-xs focus:ring-blue-500 focus:border-blue-500"
+            />
+            <input
+                type="text"
+                value={value}
+                onChange={(e) => setValue(e.target.value)}
+                placeholder="Valeur"
+                className="w-full bg-white border border-gray-300 px-2 py-1 rounded text-xs focus:ring-blue-500 focus:border-blue-500"
+            />
+        </div>
+        
+        {/* Bouton Enregistrer/Valider */}
+        <button
+          type="button"
+          onClick={() => onSave(initialKey, key, value)}
+          className="text-green-600 hover:text-green-800 focus:outline-none p-1 transition-colors rounded hover:bg-green-100"
+          title="Valider la modification"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+          </svg>
+        </button>
+
+        {/* Bouton Annuler/Supprimer */}
+        <button
+            type="button"
+            onClick={() => onRemove(initialKey)}
+            className="text-gray-400 hover:text-red-500 focus:outline-none ml-1 transition-colors p-1 rounded hover:bg-red-50"
+            title="Annuler/Supprimer"
+        >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+        </button>
+      </div>
+    );
+  };
+  
+  // 🎯 Composant interne pour la gestion de l'affichage d'une spec
+  const SpecItem = ({ specKey, specValue, onEditStart, onRemove }) => (
+    <div
+      className="flex justify-between items-center bg-white px-3 py-2 rounded-lg text-sm border border-gray-200 hover:border-gray-300 transition-colors group cursor-pointer"
+      onClick={() => onEditStart(specKey)} // Clic pour commencer l'édition
+    >
+      <div className="flex-1 min-w-0 flex items-center">
+        <span className="font-semibold text-blue-600 truncate">{specKey}:</span>
+        <span className="text-gray-700 ml-1 truncate">{specValue}</span>
+      </div>
+      {/* Bouton d'édition (visible au survol) */}
+      <button
+        type="button"
+        onClick={(e) => { 
+            e.stopPropagation(); // Empêcher le clic de l'édition
+            onEditStart(specKey);
+        }}
+        className="text-gray-400 hover:text-blue-500 focus:outline-none ml-2 transition-colors p-1 rounded hover:bg-blue-50 opacity-0 group-hover:opacity-100"
+        title="Modifier"
+      >
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-9-4l9-9m-9 9l5 5m-9-9l5 5m5-5v.01" />
+        </svg>
+      </button>
+
+      {/* Bouton Supprimer */}
+      <button
+        type="button"
+        onClick={(e) => { 
+            e.stopPropagation(); // Empêcher le clic de l'édition
+            onRemove(specKey);
+        }}
+        className="text-gray-400 hover:text-red-500 focus:outline-none ml-2 transition-colors p-1 rounded hover:bg-red-50"
+        title="Supprimer"
+      >
+        <svg
+          className="w-4 h-4"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+    </div>
+  );
+
 
   return (
     <div className="fixed inset-0 bg-gray-900 bg-opacity-60 flex items-center justify-center p-4 z-50">
@@ -267,12 +383,14 @@ const UpdateStockForm = ({ isOpen, onClose, onStockUpdated, stockId }) => {
         </div>
 
         {loading ? (
+          // ... (affichage loading inchangé)
           <div className="flex flex-col items-center justify-center py-12">
             <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-600 mb-4"></div>
             <p className="text-gray-500">Chargement des données...</p>
             <p className="text-gray-400 text-sm mt-2">ID: {stockId}</p>
           </div>
         ) : errors.fetch ? (
+          // ... (affichage erreur fetch inchangé)
           <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
             <div className="text-red-500 text-lg mb-3">⚠️</div>
             <p className="text-red-700 font-medium mb-4">{errors.fetch}</p>
@@ -293,8 +411,8 @@ const UpdateStockForm = ({ isOpen, onClose, onStockUpdated, stockId }) => {
               </div>
             )}
 
+            {/* ... (Nom, Type, Stock, Seuil - inchangés) ... */}
             
-
             {/* Nom */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -394,7 +512,7 @@ const UpdateStockForm = ({ isOpen, onClose, onStockUpdated, stockId }) => {
               </div>
             </div>
 
-            {/* Upload photo */}
+            {/* Upload photo (inchangé) */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Photo du matériel
@@ -409,7 +527,6 @@ const UpdateStockForm = ({ isOpen, onClose, onStockUpdated, stockId }) => {
                       alt="Current"
                       className="mx-auto h-24 w-24 object-cover rounded-lg border-2 border-gray-200"
                       onError={(e) => {
-                        console.error("❌ Erreur chargement photo:", currentPhoto);
                         e.target.style.display = 'none';
                       }}
                     />
@@ -479,7 +596,7 @@ const UpdateStockForm = ({ isOpen, onClose, onStockUpdated, stockId }) => {
               )}
             </div>
 
-            {/* Spécifications */}
+            {/* Spécifications - LOGIQUE D'AFFICHAGE MODIFIÉE */}
             <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
               <div className="flex items-center justify-between mb-3">
                 <label className="block text-sm font-medium text-gray-700">
@@ -494,6 +611,7 @@ const UpdateStockForm = ({ isOpen, onClose, onStockUpdated, stockId }) => {
                 </div>
               </div>
 
+              {/* Bloc d'ajout (inchangé) */}
               <div className="flex gap-3 mb-4 bg-white p-3 rounded-lg border border-gray-200">
                 <div className="flex-1 min-w-0">
                   <input
@@ -530,7 +648,7 @@ const UpdateStockForm = ({ isOpen, onClose, onStockUpdated, stockId }) => {
                 <button
                   type="button"
                   onClick={handleAddSpec}
-                  disabled={!newSpec.key.trim() || !newSpec.value.trim()}
+                  disabled={!newSpec.key.trim() || !newSpec.value.trim() || editingSpecKey}
                   className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-30 disabled:cursor-not-allowed transition-all flex items-center justify-center min-w-[50px] font-bold text-lg shadow-sm hover:shadow-md"
                   title="Ajouter la spécification"
                 >
@@ -538,40 +656,34 @@ const UpdateStockForm = ({ isOpen, onClose, onStockUpdated, stockId }) => {
                 </button>
               </div>
 
-              {errors.spec && (
+              {(errors.spec || errors.editSpec) && (
                 <p className="text-red-500 text-sm mb-2 flex items-center">
                   <span className="w-1.5 h-1.5 bg-red-500 rounded-full mr-2"></span>
-                  {errors.spec}
+                  {errors.spec || errors.editSpec}
                 </p>
               )}
 
+              {/* Liste des spécifications (MODIFIÉ) */}
               <div className="space-y-2 max-h-40 overflow-y-auto">
                 {Object.entries(formData.specifications).length > 0 ? (
                   Object.entries(formData.specifications).map(([key, value]) => (
-                    <div
-                      key={key}
-                      className="flex justify-between items-center bg-white px-3 py-2 rounded-lg text-sm border border-gray-200 hover:border-gray-300 transition-colors group"
-                    >
-                      <div className="flex-1 min-w-0">
-                        <span className="font-semibold text-blue-600 truncate">{key}:</span>
-                        <span className="text-gray-700 ml-1 truncate">{value}</span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveSpec(key)}
-                        className="text-gray-400 hover:text-red-500 focus:outline-none ml-2 transition-colors p-1 rounded hover:bg-red-50"
-                        title="Supprimer"
-                      >
-                        <svg
-                          className="w-4 h-4"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </button>
-                    </div>
+                    key === editingSpecKey ? (
+                      <EditableSpecItem 
+                        key={key}
+                        initialKey={key}
+                        initialValue={value}
+                        onSave={handleEditSpec}
+                        onRemove={() => setEditingSpecKey(null)} // Annuler l'édition
+                      />
+                    ) : (
+                      <SpecItem
+                        key={key}
+                        specKey={key}
+                        specValue={value}
+                        onEditStart={setEditingSpecKey}
+                        onRemove={handleRemoveSpec}
+                      />
+                    )
                   ))
                 ) : (
                   <div className="text-center py-4 text-gray-400">
@@ -594,19 +706,19 @@ const UpdateStockForm = ({ isOpen, onClose, onStockUpdated, stockId }) => {
               </div>
             </div>
 
-            {/* Boutons */}
+            {/* Boutons (inchangé) */}
             <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
               <button
                 type="button"
                 onClick={handleClose}
-                disabled={submitting}
+                disabled={submitting || editingSpecKey}
                 className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-500 disabled:opacity-50 transition-all font-medium"
               >
                 Annuler
               </button>
               <button
                 type="submit"
-                disabled={submitting}
+                disabled={submitting || editingSpecKey}
                 className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 transition-all font-medium flex items-center gap-2"
               >
                 {submitting ? (

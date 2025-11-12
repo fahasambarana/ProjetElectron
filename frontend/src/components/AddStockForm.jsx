@@ -107,26 +107,36 @@ const AddStockForm = ({ isOpen, onClose, onStockAdded }) => {
     try {
       setSubmitting(true);
 
+      // ✅ CORRECTION : Créer FormData correctement
       const submitData = new FormData();
+      
+      // ✅ CORRECTION : Convertir les nombres en strings pour FormData
       submitData.append("name", formData.name);
       submitData.append("type", formData.type);
-      submitData.append("stock", Number(formData.stock));
-      submitData.append("threshold", Number(formData.threshold));
+      submitData.append("stock", String(formData.stock)); // Convertir en string
+      submitData.append("threshold", String(formData.threshold)); // Convertir en string
 
-      submitData.append(
-        "specifications",
-        JSON.stringify(formData.specifications ?? {})
-      );
+      // ✅ CORRECTION : Gérer les spécifications vides
+      const specs = Object.keys(formData.specifications).length > 0 
+        ? formData.specifications 
+        : {};
+      submitData.append("specifications", JSON.stringify(specs));
 
       if (photo) {
         submitData.append("photo", photo);
       }
 
-      const response = await api.post("/stocks", submitData, {
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
-      });
+      // ✅ CORRECTION : Debug pour voir le contenu de FormData
+      console.log("📤 Contenu de FormData:");
+      for (let [key, value] of submitData.entries()) {
+        console.log(`  ${key}:`, value);
+      }
+
+      // ✅ CORRECTION : Ne PAS spécifier Content-Type - laisser axios gérer automatiquement
+      const response = await api.post("/stocks", submitData);
+      // ❌ SUPPRIMER les headers: { "Content-Type": "multipart/form-data" }
+
+      console.log("✅ Réponse du serveur:", response.data);
 
       // Réinitialisation du formulaire après succès
       setFormData({
@@ -144,7 +154,9 @@ const AddStockForm = ({ isOpen, onClose, onStockAdded }) => {
       if (onStockAdded) onStockAdded();
       onClose();
     } catch (err) {
-      console.error("Erreur lors de l'envoi:", err);
+      console.error("❌ Erreur lors de l'envoi:", err);
+      console.error("❌ Détails de l'erreur:", err.response?.data);
+      
       if (err.response?.data?.errors) {
         const validationErrors = {};
         Object.keys(err.response.data.errors).forEach((key) => {
@@ -192,7 +204,6 @@ const AddStockForm = ({ isOpen, onClose, onStockAdded }) => {
 
   return (
     <div className="fixed inset-0 bg-gray-900 bg-opacity-60 flex items-center justify-center p-4 z-50">
-      {/* Augmentation de la largeur max de max-w-md à max-w-lg */}
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-xl font-semibold text-gray-800">Nouveau matériel</h2>
