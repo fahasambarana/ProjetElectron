@@ -54,10 +54,31 @@ const StockList = () => {
   const fetchStocks = async () => {
     try {
       const res = await api.get("/stocks");
-      setStocks(res.data);
-
+      
+      // ✅ CORRECTION : S'assurer que stocks est toujours un tableau
+      let stocksData = [];
+      
+      if (Array.isArray(res.data)) {
+        // Si la réponse est directement un tableau
+        stocksData = res.data;
+      } else if (res.data && Array.isArray(res.data.data)) {
+        // Si la réponse a une propriété data qui est un tableau
+        stocksData = res.data.data;
+      } else if (res.data && Array.isArray(res.data.stocks)) {
+        // Si la réponse a une propriété stocks qui est un tableau
+        stocksData = res.data.stocks;
+      } else {
+        // Si la structure est inattendue, logger pour debug
+        console.warn("Structure de réponse inattendue:", res.data);
+        stocksData = [];
+      }
+      
+      setStocks(stocksData);
+      
     } catch (err) {
+      console.error("Erreur chargement stocks:", err);
       setError("Impossible de charger les stocks");
+      setStocks([]); // ✅ S'assurer que stocks reste un tableau même en cas d'erreur
     } finally {
       setLoading(false);
     }
@@ -205,11 +226,11 @@ const StockList = () => {
     return icons[type] || icons.Autre;
   };
 
-  // Filtrage des stocks
-  const filteredStocks = stocks.filter((item) => {
+  // ✅ CORRECTION : S'assurer que filteredStocks est toujours un tableau
+  const filteredStocks = Array.isArray(stocks) ? stocks.filter((item) => {
     const matchesSearch = 
-      item.name.toLowerCase().includes(search.toLowerCase()) ||
-      item.type.toLowerCase().includes(search.toLowerCase()) ||
+      item.name?.toLowerCase().includes(search.toLowerCase()) ||
+      item.type?.toLowerCase().includes(search.toLowerCase()) ||
       (item.specifications && Object.values(item.specifications).some(spec => 
         String(spec).toLowerCase().includes(search.toLowerCase())
       ));
@@ -222,23 +243,23 @@ const StockList = () => {
       (filterStatus === "in" && item.stock > item.threshold);
     
     return matchesSearch && matchesType && matchesStatus;
-  });
+  }) : [];
 
-  // Statistiques pour les badges
+  // ✅ CORRECTION : S'assurer que les statistiques fonctionnent même si stocks n'est pas un tableau
   const stats = {
-    total: stocks.length,
-    inStock: stocks.filter((item) => item.stock > item.threshold).length,
-    lowStock: stocks.filter((item) => item.stock <= item.threshold && item.stock > 0).length,
-    outOfStock: stocks.filter((item) => item.stock === 0).length,
+    total: Array.isArray(stocks) ? stocks.length : 0,
+    inStock: Array.isArray(stocks) ? stocks.filter((item) => item.stock > item.threshold).length : 0,
+    lowStock: Array.isArray(stocks) ? stocks.filter((item) => item.stock <= item.threshold && item.stock > 0).length : 0,
+    outOfStock: Array.isArray(stocks) ? stocks.filter((item) => item.stock === 0).length : 0,
     byType: {
-      PC: stocks.filter(item => item.type === "PC").length,
-      Projecteur: stocks.filter(item => item.type === "Projecteur").length,
-      Switch: stocks.filter(item => item.type === "Switch").length,
-      Adaptateur: stocks.filter(item => item.type === "Adaptateur").length,
-      Routeur: stocks.filter(item => item.type === "Routeur").length,
-      Autre: stocks.filter(item => item.type === "Autre").length
+      PC: Array.isArray(stocks) ? stocks.filter(item => item.type === "PC").length : 0,
+      Projecteur: Array.isArray(stocks) ? stocks.filter(item => item.type === "Projecteur").length : 0,
+      Switch: Array.isArray(stocks) ? stocks.filter(item => item.type === "Switch").length : 0,
+      Adaptateur: Array.isArray(stocks) ? stocks.filter(item => item.type === "Adaptateur").length : 0,
+      Routeur: Array.isArray(stocks) ? stocks.filter(item => item.type === "Routeur").length : 0,
+      Autre: Array.isArray(stocks) ? stocks.filter(item => item.type === "Autre").length : 0
     },
-    withPhotos: stocks.filter(item => item.photo).length
+    withPhotos: Array.isArray(stocks) ? stocks.filter(item => item.photo).length : 0
   };
 
   // Formatage de la date
@@ -367,7 +388,7 @@ const StockList = () => {
                 <p className="text-3xl font-bold text-green-600 mt-2">{stats.inStock}</p>
                 <p className="text-xs text-green-600 mt-2 flex items-center gap-1">
                   <Zap className="h-3 w-3" />
-                  {((stats.inStock / stats.total) * 100).toFixed(1)}% du total
+                  {stats.total > 0 ? `${((stats.inStock / stats.total) * 100).toFixed(1)}% du total` : '0% du total'}
                 </p>
               </div>
               <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-green-600 rounded-xl flex items-center justify-center shadow-sm">

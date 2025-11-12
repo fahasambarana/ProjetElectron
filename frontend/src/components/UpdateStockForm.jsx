@@ -26,28 +26,59 @@ const UpdateStockForm = ({ isOpen, onClose, onStockUpdated, stockId }) => {
       }
       setLoading(true);
       try {
+        console.log("🔄 Chargement du stock ID:", stockId); // Debug
         const res = await api.get(`/stocks/${stockId}`);
+        console.log("📦 Données reçues:", res.data); // Debug
+        
         const stock = res.data;
         
+        // ✅ CORRECTION : Vérifier la structure des données
+        const stockData = stock.data || stock; // Support des deux structures
+        
         setFormData({
-          name: stock.name || "",
-          type: stock.type || "",
-          stock: stock.stock?.toString() || "",
-          threshold: stock.threshold?.toString() || "",
-          specifications: stock.specifications || {},
+          name: stockData.name || "",
+          type: stockData.type || "",
+          stock: stockData.stock?.toString() || "",
+          threshold: stockData.threshold?.toString() || "",
+          specifications: stockData.specifications || {},
         });
         
-        setCurrentPhoto(stock.photo || null);
+        setCurrentPhoto(stockData.photo || null);
         setErrors({});
+        
+        console.log("✅ Données chargées dans le formulaire:", { // Debug
+          name: stockData.name,
+          type: stockData.type,
+          stock: stockData.stock,
+          specifications: stockData.specifications
+        });
+        
       } catch (err) {
-        console.error("Erreur chargement stock:", err);
+        console.error("❌ Erreur chargement stock:", err);
+        console.error("❌ Détails erreur:", err.response?.data); // Debug
         setErrors({ fetch: "Impossible de charger les données du stock" });
       } finally {
         setLoading(false);
       }
     };
     
-    if (isOpen && stockId) fetchStock();
+    if (isOpen && stockId) {
+      console.log("🎯 Modal ouvert, chargement du stock..."); // Debug
+      fetchStock();
+    } else {
+      // Réinitialiser quand le modal est fermé
+      setFormData({
+        name: "",
+        type: "",
+        stock: "",
+        threshold: "",
+        specifications: {},
+      });
+      setCurrentPhoto(null);
+      setPhoto(null);
+      setPhotoPreview(null);
+      setNewSpec({ key: "", value: "" });
+    }
   }, [isOpen, stockId]);
 
   // Mise à jour générique des champs
@@ -144,6 +175,7 @@ const UpdateStockForm = ({ isOpen, onClose, onStockUpdated, stockId }) => {
 
     try {
       setSubmitting(true);
+      console.log("📤 Envoi des données:", formData); // Debug
 
       const submitData = new FormData();
       submitData.append("name", formData.name);
@@ -156,11 +188,18 @@ const UpdateStockForm = ({ isOpen, onClose, onStockUpdated, stockId }) => {
         submitData.append("photo", photo);
       }
 
-      await api.put(`/stocks/${stockId}`, submitData, {
+      // Debug: Afficher le contenu de FormData
+      for (let [key, value] of submitData.entries()) {
+        console.log(`FormData ${key}:`, value);
+      }
+
+      const response = await api.put(`/stocks/${stockId}`, submitData, {
         headers: {
           "Content-Type": "multipart/form-data",
         },
       });
+
+      console.log("✅ Réponse mise à jour:", response.data); // Debug
 
       // Réinitialisation après succès
       setFormData({
@@ -178,7 +217,8 @@ const UpdateStockForm = ({ isOpen, onClose, onStockUpdated, stockId }) => {
       if (onStockUpdated) onStockUpdated();
       onClose();
     } catch (err) {
-      console.error("Erreur mise à jour:", err);
+      console.error("❌ Erreur mise à jour:", err);
+      console.error("❌ Détails erreur:", err.response?.data); // Debug
       setErrors({
         submit: err.response?.data?.message || "Erreur lors de la mise à jour du stock. Veuillez réessayer.",
       });
@@ -215,7 +255,9 @@ const UpdateStockForm = ({ isOpen, onClose, onStockUpdated, stockId }) => {
     <div className="fixed inset-0 bg-gray-900 bg-opacity-60 flex items-center justify-center p-4 z-50">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-xl font-semibold text-gray-800">Modifier le matériel</h2>
+          <h2 className="text-xl font-semibold text-gray-800">
+            Modifier le matériel 
+          </h2>
           <button
             onClick={handleClose}
             className="text-gray-400 hover:text-gray-600 text-xl transition-colors"
@@ -228,6 +270,7 @@ const UpdateStockForm = ({ isOpen, onClose, onStockUpdated, stockId }) => {
           <div className="flex flex-col items-center justify-center py-12">
             <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-600 mb-4"></div>
             <p className="text-gray-500">Chargement des données...</p>
+            <p className="text-gray-400 text-sm mt-2">ID: {stockId}</p>
           </div>
         ) : errors.fetch ? (
           <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
@@ -249,6 +292,8 @@ const UpdateStockForm = ({ isOpen, onClose, onStockUpdated, stockId }) => {
                 </p>
               </div>
             )}
+
+            
 
             {/* Nom */}
             <div>
@@ -363,6 +408,10 @@ const UpdateStockForm = ({ isOpen, onClose, onStockUpdated, stockId }) => {
                       src={getPhotoUrl(currentPhoto)}
                       alt="Current"
                       className="mx-auto h-24 w-24 object-cover rounded-lg border-2 border-gray-200"
+                      onError={(e) => {
+                        console.error("❌ Erreur chargement photo:", currentPhoto);
+                        e.target.style.display = 'none';
+                      }}
                     />
                   </div>
                 )}

@@ -243,6 +243,64 @@ export default function EmpruntList() {
     }
   }, [emprunts, calculerEmpruntsEnRetardFallback]);
 
+  // 🔥 NOUVEAU : Fonction optimisée pour mettre à jour automatiquement les données
+  const updateEmpruntsData = useCallback((updatedEmprunt) => {
+    setEmprunts(prev => {
+      const newEmprunts = prev.map(e => 
+        e._id === updatedEmprunt._id ? updatedEmprunt : e
+      );
+      
+      // Mettre à jour immédiatement les alertes de retard
+      const empruntsNonRendus = newEmprunts.filter(e => !e.heureEntree && e.dateRetour);
+      const empruntsRetard = empruntsNonRendus.filter(emprunt => {
+        const joursRetard = calculerJoursRetard(emprunt.dateRetour);
+        return joursRetard >= 10;
+      });
+      
+      // Trier par jours de retard décroissant
+      empruntsRetard.sort((a, b) => {
+        const retardA = calculerJoursRetard(a.dateRetour);
+        const retardB = calculerJoursRetard(b.dateRetour);
+        return retardB - retardA;
+      });
+      
+      setEmpruntsEnRetard(empruntsRetard);
+      
+      return newEmprunts;
+    });
+  }, [calculerJoursRetard]);
+
+  // 🔥 NOUVEAU : Fonction optimisée pour ajouter un emprunt
+  const addEmpruntData = useCallback((newEmprunt) => {
+    setEmprunts(prev => {
+      const newEmprunts = [newEmprunt, ...prev];
+      
+      // Vérifier si le nouvel emprunt est en retard
+      if (!newEmprunt.heureEntree && newEmprunt.dateRetour) {
+        const joursRetard = calculerJoursRetard(newEmprunt.dateRetour);
+        if (joursRetard >= 10) {
+          setEmpruntsEnRetard(prevRetard => {
+            const updatedRetard = [newEmprunt, ...prevRetard];
+            // Trier par jours de retard décroissant
+            return updatedRetard.sort((a, b) => {
+              const retardA = calculerJoursRetard(a.dateRetour);
+              const retardB = calculerJoursRetard(b.dateRetour);
+              return retardB - retardA;
+            });
+          });
+        }
+      }
+      
+      return newEmprunts;
+    });
+  }, [calculerJoursRetard]);
+
+  // 🔥 NOUVEAU : Fonction optimisée pour supprimer un emprunt
+  const removeEmpruntData = useCallback((empruntId) => {
+    setEmprunts(prev => prev.filter(e => e._id !== empruntId));
+    setEmpruntsEnRetard(prev => prev.filter(e => e._id !== empruntId));
+  }, []);
+
   // 🔥 CORRECTION : Fonction de test améliorée
   const testerAlertes = useCallback(async () => {
     try {
@@ -301,33 +359,27 @@ export default function EmpruntList() {
     }
   }, [emprunts, fetchAlertesRetard]);
 
-  // Fonctions de gestion des actions
+  // 🔥 MODIFICATION : Fonctions de gestion des actions optimisées
   const handleEmpruntAdded = useCallback(async (newEmprunt) => {
     try {
       const empruntData = newEmprunt.data || newEmprunt;
-      setEmprunts((prev) => [empruntData, ...prev]);
-      // Recharger les alertes après ajout
-      setTimeout(() => fetchAlertesRetard(), 500);
+      addEmpruntData(empruntData);
       setShowModal(false);
     } catch (error) {
       console.error("Erreur handleEmpruntAdded:", error);
     }
-  }, [fetchAlertesRetard]);
+  }, [addEmpruntData]);
 
   const handleEmpruntUpdated = useCallback(async (updatedEmprunt) => {
     try {
       const empruntData = updatedEmprunt.data || updatedEmprunt;
-      setEmprunts((prev) =>
-        prev.map((e) => (e._id === empruntData._id ? empruntData : e))
-      );
-      // Recharger les alertes après modification
-      setTimeout(() => fetchAlertesRetard(), 500);
+      updateEmpruntsData(empruntData);
       setShowUpdateModal(false);
       setSelectedEmprunt(null);
     } catch (error) {
       console.error("Erreur handleEmpruntUpdated:", error);
     }
-  }, [fetchAlertesRetard]);
+  }, [updateEmpruntsData]);
 
   const handleEditClick = useCallback((emprunt) => {
     setSelectedEmprunt(emprunt);
@@ -360,14 +412,8 @@ export default function EmpruntList() {
 
       const updatedEmprunt = res.data.data || res.data;
 
-      setEmprunts((prev) =>
-        prev.map((e) =>
-          e._id === showDateConfirmation.id ? updatedEmprunt : e
-        )
-      );
-
-      // Recharger les alertes après marquage comme rendu
-      setTimeout(() => fetchAlertesRetard(), 500);
+      // 🔥 MODIFICATION : Mise à jour immédiate sans rechargement
+      updateEmpruntsData(updatedEmprunt);
       setShowDateConfirmation(null);
     } catch (err) {
       console.error("Erreur marquage rendu:", err);
@@ -376,7 +422,7 @@ export default function EmpruntList() {
       );
       setShowDateConfirmation(null);
     }
-  }, [showDateConfirmation, fetchAlertesRetard]);
+  }, [showDateConfirmation, updateEmpruntsData]);
 
   const cancelRendu = useCallback(() => {
     setShowDateConfirmation(null);
@@ -386,14 +432,13 @@ export default function EmpruntList() {
     if (!window.confirm("Voulez-vous vraiment supprimer cet emprunt ?")) return;
     try {
       await axios.delete(`http://localhost:5000/api/emprunts/${empruntId}`);
-      setEmprunts((prev) => prev.filter((e) => e._id !== empruntId));
-      // Recharger les alertes après suppression
-      setTimeout(() => fetchAlertesRetard(), 500);
+      // 🔥 MODIFICATION : Suppression immédiate sans rechargement
+      removeEmpruntData(empruntId);
     } catch (err) {
       console.error("Erreur suppression:", err);
       alert(err.response?.data?.message || "Impossible de supprimer l'emprunt");
     }
-  }, [fetchAlertesRetard]);
+  }, [removeEmpruntData]);
 
   // 🔥 CORRECTION : Fonction améliorée pour vérifier manuellement les retards
   const verifierRetardsManuellement = useCallback(async () => {
@@ -422,13 +467,12 @@ export default function EmpruntList() {
     setRefreshing(true);
     try {
       await fetchEmprunts();
-      await fetchAlertesRetard();
     } catch (err) {
       console.error("Erreur lors du rafraîchissement:", err);
     } finally {
       setRefreshing(false);
     }
-  }, [fetchEmprunts, fetchAlertesRetard]);
+  }, [fetchEmprunts]);
 
   // 🔥 CORRECTION : Fonction améliorée pour vérifier si un emprunt est en retard
   const isEmpruntEnRetard = useCallback((emprunt) => {
