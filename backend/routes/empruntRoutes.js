@@ -1,25 +1,38 @@
 const express = require('express');
 const router = express.Router();
 const empruntController = require('../controllers/empruntController');
+const mongoose = require('mongoose');
 
-router.get("/count", empruntController.countEmprunts);
-// GET /api/emprunts - Lister tous les emprunts
+// Middleware de validation ObjectId
+const validateObjectId = (req, res, next) => {
+  const { id } = req.params;
+  
+  if (id && !mongoose.Types.ObjectId.isValid(id)) {
+    return res.status(400).json({
+      success: false,
+      message: "ID invalide",
+      error: `L'ID "${id}" n'est pas un identifiant valide`
+    });
+  }
+  next();
+};
+
+// ✅ ROUTES STATIQUES EN PREMIER (TRÈS IMPORTANT)
+router.get('/count', empruntController.countEmprunts);
+router.get('/stats/count', empruntController.countEmprunts);
+router.get('/stats/statistiques', empruntController.getStats);
+router.get('/search', empruntController.searchEmprunts);
+
+// ✅ ROUTES SANS PARAMÈTRES
 router.get('/', empruntController.getEmprunts);
-
-// GET /api/emprunts/:id - Récupérer un emprunt par ID
-router.get('/:id', empruntController.getEmpruntById);
-
-// POST /api/emprunts - Créer un nouvel emprunt
 router.post('/', empruntController.createEmprunt);
 
-// PUT /api/emprunts/:id - Modifier complètement un emprunt
-router.put('/:id', empruntController.updateEmprunt);
+// ✅ ROUTES AVEC PARAMÈTRES SPÉCIFIQUES
+router.put('/rendu/:id', validateObjectId, empruntController.marquerCommeRendu);
 
-// PUT /api/emprunts/rendu/:id - Marquer comme rendu (heure d'entrée seulement)
-router.put('/rendu/:id', empruntController.marquerRendu);
-
-// DELETE /api/emprunts/:id - Supprimer un emprunt
-router.delete('/:id', empruntController.deleteEmprunt);
-
+// ✅ ROUTES AVEC PARAMÈTRES GÉNÉRIQUES (EN DERNIER)
+router.get('/:id', validateObjectId, empruntController.getEmpruntById);
+router.put('/:id', validateObjectId, empruntController.updateEmprunt);
+router.delete('/:id', validateObjectId, empruntController.deleteEmprunt);
 
 module.exports = router;

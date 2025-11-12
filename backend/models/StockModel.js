@@ -1,4 +1,4 @@
-const mongoose = require("mongoose");
+const mongoose = require('mongoose');
 
 const stockSchema = new mongoose.Schema(
   {
@@ -16,6 +16,14 @@ const stockSchema = new mongoose.Schema(
       of: mongoose.Schema.Types.Mixed,
       default: new Map(), 
     },
+      category: {
+    type: String,
+    trim: true
+  },
+  disponible: {
+    type: Boolean,
+    default: true
+  },
 
     photo: {
       type: String, // URL de la photo
@@ -24,4 +32,4 @@ const stockSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-module.exports = mongoose.model("Stock", stockSchema);
+module.exports = mongoose.model('Stock', stockSchema);

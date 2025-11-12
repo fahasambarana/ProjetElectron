@@ -4,11 +4,13 @@ const empruntSchema = new mongoose.Schema(
   {
     matricule: { type: String, required: true },
     prenoms: { type: String, required: true },
-    date: { type: Date, required: true },
+    dateEmprunt: { type: Date, required: true },
+    dateRetour: { type: Date }, // Date de retour prévue
+    dateRetourEffective: { type: Date }, // Date réelle de retour
     niveau: { type: String, required: true },
     parcours: { type: String, required: true },
     heureSortie: { type: String, required: true },
-    heureEntree: { type: String }, // peut être vide au début
+    heureEntree: { type: String },
     materiel: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Stock",
