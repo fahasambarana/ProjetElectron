@@ -495,49 +495,21 @@ exports.getStats = async (req, res) => {
 };
 
 // Recherche avancée d'emprunts
-exports.searchEmprunts = async (req, res) => {
+exports.countEmprunts = async (req, res) => {
   try {
-    const { search, statut, dateDebut, dateFin } = req.query;
+    const count = await Emprunt.countDocuments();
     
-    let query = {};
-
-    // Filtre par statut
-    if (statut === 'rendu') {
-      query.heureEntree = { $exists: true };
-    } else if (statut === 'non-rendu') {
-      query.heureEntree = { $exists: false };
-    }
-
-    // Filtre par date
-    if (dateDebut || dateFin) {
-      query.dateEmprunt = {};
-      if (dateDebut) query.dateEmprunt.$gte = new Date(dateDebut);
-      if (dateFin) query.dateEmprunt.$lte = new Date(dateFin);
-    }
-
-    // Recherche texte
-    if (search) {
-      query.$or = [
-        { matricule: { $regex: search, $options: 'i' } },
-        { prenoms: { $regex: search, $options: 'i' } },
-      ];
-    }
-
-    const emprunts = await Emprunt.find(query)
-      .populate("materiel")
-      .sort({ createdAt: -1 });
-
-    res.json({
+    res.status(200).json({
       success: true,
-      count: emprunts.length,
-      data: emprunts,
+      count: count,
+      message: `Nombre total d'emprunts récupéré avec succès`
     });
-  } catch (err) {
-    console.error("Erreur recherche emprunts:", err);
+  } catch (error) {
+    console.error('Erreur comptage emprunts:', error);
     res.status(500).json({
       success: false,
-      message: "Erreur lors de la recherche des emprunts",
-      error: err.message,
+      message: "Erreur serveur lors du comptage des emprunts",
+      error: error.message
     });
   }
 };

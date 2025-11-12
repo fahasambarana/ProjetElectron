@@ -21,7 +21,6 @@ const validateObjectId = (req, res, next) => {
 router.get('/count', empruntController.countEmprunts);
 router.get('/stats/count', empruntController.countEmprunts);
 router.get('/stats/statistiques', empruntController.getStats);
-router.get('/search', empruntController.searchEmprunts);
 
 // ✅ ROUTES SANS PARAMÈTRES
 router.get('/', empruntController.getEmprunts);
