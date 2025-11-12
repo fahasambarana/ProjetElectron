@@ -1,36 +1,35 @@
 const mongoose = require('mongoose');
 
-const stockSchema = new mongoose.Schema({
-  name: {
-    type: String,
-    required: [true, "Le nom du matériel est obligatoire"],
-    trim: true,
-    unique: true
-  },
-  description: {
-    type: String,
-    trim: true
-  },
-  stock: {
-    type: Number,
-    required: [true, "Le stock est obligatoire"],
-    min: [0, "Le stock ne peut pas être négatif"]
-  },
-  category: {
+const stockSchema = new mongoose.Schema(
+  {
+    name: { type: String, required: true },
+    type: {
+      type: String,
+      required: true,
+      enum: ["PC", "Projecteur", "Switch", "Adaptateur", "Routeur", "Autre"],
+    },
+    stock: { type: Number, required: true, min: 0 },
+    threshold: { type: Number, required: true, min: 0 },
+
+    specifications: {
+      type: Map,
+      of: mongoose.Schema.Types.Mixed,
+      default: new Map(), 
+    },
+      category: {
     type: String,
     trim: true
   },
   disponible: {
     type: Boolean,
     default: true
-  }
-}, {
-  timestamps: true
-});
+  },
 
-// Index pour optimiser les recherches
-stockSchema.index({ name: 1 });
-stockSchema.index({ category: 1 });
-stockSchema.index({ disponible: 1 });
+    photo: {
+      type: String, // URL de la photo
+    },
+  },
+  { timestamps: true }
+);
 
 module.exports = mongoose.model('Stock', stockSchema);

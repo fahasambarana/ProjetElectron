@@ -2,19 +2,59 @@ import React, { useState } from "react";
 import api from "../services/api";
 
 const AddStockForm = ({ isOpen, onClose, onStockAdded }) => {
-  const [formData, setFormData] = useState({ name: "", stock: "", threshold: "0" });
+  const [formData, setFormData] = useState({
+    name: "",
+    type: "",
+    stock: "",
+    threshold: "0",
+    specifications: {},
+  });
+  const [newSpec, setNewSpec] = useState({ key: "", value: "" });
+  const [photo, setPhoto] = useState(null);
   const [errors, setErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
 
-  const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
+  const handleChange = (e) => 
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+
+  const handlePhotoChange = (e) => {
+    setPhoto(e.target.files[0]);
+  };
+
+  const handleAddSpec = () => {
+    if (!newSpec.key.trim() || !newSpec.value.trim()) {
+      setErrors(prev => ({ ...prev, spec: "La clé et la valeur sont requises" }));
+      return;
+    }
+    
+    // ✅ CORRECTION : S'assurer que les spécifications sont bien mises à jour
+    setFormData((prev) => ({
+      ...prev,
+      specifications: {
+        ...prev.specifications,
+        [newSpec.key.trim()]: newSpec.value.trim(),
+      },
+    }));
+    
+    setNewSpec({ key: "", value: "" });
+    setErrors(prev => ({ ...prev, spec: "" }));
+  };
+
+  const handleRemoveSpec = (key) => {
+    const updated = { ...formData.specifications };
+    delete updated[key];
+    setFormData({ ...formData, specifications: updated });
+  };
 
   const validate = () => {
     const newErrors = {};
     if (!formData.name.trim()) newErrors.name = "Le nom du produit est requis";
-    if (!formData.stock || isNaN(formData.stock) || formData.stock < 0) 
-      newErrors.stock = "Veuillez entrer une valeur de stock valide";
-    if (!formData.threshold || isNaN(formData.threshold) || formData.threshold < 0) 
-      newErrors.threshold = "Veuillez entrer un seuil valide";
+    if (!formData.type.trim()) newErrors.type = "Le type d'appareil est requis";
+    if (!formData.stock || isNaN(formData.stock) || formData.stock < 0)
+      newErrors.stock = "Stock invalide";
+    if (!formData.threshold || isNaN(formData.threshold) || formData.threshold < 0)
+      newErrors.threshold = "Seuil invalide";
+    
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -25,146 +65,317 @@ const AddStockForm = ({ isOpen, onClose, onStockAdded }) => {
 
     try {
       setSubmitting(true);
-      await api.post("/stocks", {
-        name: formData.name,
-        stock: Number(formData.stock),
-        threshold: Number(formData.threshold),
+      
+      // Création FormData pour envoyer les fichiers
+      const submitData = new FormData();
+      submitData.append("name", formData.name);
+      submitData.append("type", formData.type);
+      submitData.append("stock", Number(formData.stock));
+      submitData.append("threshold", Number(formData.threshold));
+      
+      // ✅ CORRECTION : Toujours envoyer les spécifications, même si vides
+      const specsToSend = Object.keys(formData.specifications).length > 0 
+        ? formData.specifications 
+        : {};
+      
+      submitData.append("specifications", JSON.stringify(specsToSend));
+      
+      // Ajouter la photo si elle existe
+      if (photo) {
+        submitData.append("photo", photo);
+      }
+
+      console.log("✅ Données soumises:", {
+        ...formData,
+        specifications: formData.specifications,
+        specsCount: Object.keys(formData.specifications).length
       });
+
+      // ✅ DEBUG: Afficher le contenu du FormData
+      console.log("📦 Contenu FormData:");
+      for (let [key, value] of submitData.entries()) {
+        console.log(`  ${key}:`, value);
+      }
+
+      const response = await api.post("/stocks", submitData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
+
+      console.log("✅ Réponse du serveur:", response.data);
+
       // Réinitialiser le formulaire
-      setFormData({ name: "", stock: "", threshold: "" });
+      setFormData({
+        name: "",
+        type: "",
+        stock: "",
+        threshold: "0",
+        specifications: {},
+      });
+      setPhoto(null);
+      setNewSpec({ key: "", value: "" });
       setErrors({});
       
-      // Appeler la fonction de callback si fournie
-      if (onStockAdded) {
-        onStockAdded();
-      }
-      
-      // Fermer la modale
+      if (onStockAdded) onStockAdded();
       onClose();
     } catch (err) {
-      console.error(err);
-      setErrors({ submit: "Erreur lors de la création du stock. Veuillez réessayer." });
+      console.error("❌ Erreur détaillée:", err);
+      console.error("❌ Erreur response:", err.response?.data);
+      
+      if (err.response?.data?.errors) {
+        // Gérer les erreurs de validation spécifiques
+        const validationErrors = {};
+        Object.keys(err.response.data.errors).forEach(key => {
+          validationErrors[key] = err.response.data.errors[key].message;
+        });
+        setErrors(validationErrors);
+      } else {
+        setErrors({ submit: err.response?.data?.message || "Erreur lors de la création du stock" });
+      }
     } finally {
       setSubmitting(false);
     }
   };
 
-  const handleClose = () => {
-    setFormData({ name: "", stock: "", threshold: "" });
+  const resetForm = () => {
+    setFormData({
+      name: "",
+      type: "",
+      stock: "",
+      threshold: "0",
+      specifications: {},
+    });
+    setPhoto(null);
+    setNewSpec({ key: "", value: "" });
     setErrors({});
+  };
+
+  const handleClose = () => {
+    resetForm();
     onClose();
   };
 
-  // Ne rien rendre si la modale n'est pas ouverte
+  // ✅ Fonction pour tester l'état des spécifications
+  const debugSpecs = () => {
+    console.log("🔍 État actuel des spécifications:", formData.specifications);
+    console.log("🔍 Nombre de spécifications:", Object.keys(formData.specifications).length);
+    console.log("🔍 Nouvelles spécifications en cours:", newSpec);
+  };
+
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 bg-gray-900 bg-opacity-60 flex items-center justify-center p-4 z-50">
-      <div 
-        className="bg-white rounded-xl shadow-2xl w-full max-w-md transform transition-all duration-300 scale-100 opacity-100"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex justify-between items-center p-6 border-b border-gray-100">
-          <div>
-            <h2 className="text-xl font-semibold text-gray-800">Nouveau produit en stock</h2>
-            <p className="text-sm text-gray-500 mt-1">Ajouter un nouveau produit à votre inventaire</p>
-          </div>
-          <button
-            onClick={handleClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors p-1 hover:bg-gray-100 rounded-lg"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-xl font-semibold">Nouveau matériel</h2>
+          <button onClick={handleClose} className="text-gray-400 hover:text-gray-600 text-xl">
+            ✖
           </button>
         </div>
-        
-        <form onSubmit={handleSubmit} className="p-6 space-y-5">
-          {errors.submit && (
-            <div className="bg-red-50 text-red-700 px-4 py-3 rounded-lg text-sm flex items-start">
-              <svg className="h-5 w-5 text-red-500 mr-2 mt-0.5 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-              </svg>
-              <span>{errors.submit}</span>
-            </div>
-          )}
-          
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Nom */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Nom du produit</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Nom du matériel *
+            </label>
             <input
               name="name"
               value={formData.name}
               onChange={handleChange}
-              className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors ${
-                errors.name ? "border-red-500" : "border-gray-300 hover:border-gray-400"
+              className={`w-full border px-3 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                errors.name ? 'border-red-500' : 'border-gray-300'
               }`}
-              placeholder="Ex: Ordinateur Portable Dell XPS"
+              placeholder="Ex: Projecteur Epson EB-U05"
             />
-            {errors.name && <p className="mt-2 text-sm text-red-600 flex items-center">
-              <svg className="h-4 w-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-              </svg>
-              {errors.name}
-            </p>}
+            {errors.name && <p className="text-red-500 text-sm mt-1">{errors.name}</p>}
           </div>
-          
+
+          {/* Type */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Type d'appareil *
+            </label>
+            <select
+              name="type"
+              value={formData.type}
+              onChange={handleChange}
+              className={`w-full border px-3 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                errors.type ? 'border-red-500' : 'border-gray-300'
+              }`}
+            >
+              <option value="">-- Choisir un type --</option>
+              <option value="PC">PC</option>
+              <option value="Projecteur">Projecteur</option>
+              <option value="Switch">Switch</option>
+              <option value="Adaptateur">Adaptateur</option>
+              <option value="Routeur">Routeur</option>
+              <option value="Autre">Autre</option>
+            </select>
+            {errors.type && <p className="text-red-500 text-sm mt-1">{errors.type}</p>}
+          </div>
+
+          {/* Stock et seuil */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Stock initial</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Stock *
+              </label>
               <input
                 name="stock"
                 type="number"
                 value={formData.stock}
                 onChange={handleChange}
-                className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors ${
-                  errors.stock ? "border-red-500" : "border-gray-300 hover:border-gray-400"
+                className={`w-full border px-3 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                  errors.stock ? 'border-red-500' : 'border-gray-300'
                 }`}
                 placeholder="0"
                 min="0"
               />
-              {errors.stock && <p className="mt-2 text-sm text-red-600 flex items-center">
-                <svg className="h-4 w-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                </svg>
-                {errors.stock}
-              </p>}
+              {errors.stock && <p className="text-red-500 text-sm mt-1">{errors.stock}</p>}
             </div>
-            
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Seuil d'alerte</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Seuil d'alerte
+              </label>
               <input
                 name="threshold"
                 type="number"
                 value={formData.threshold}
                 onChange={handleChange}
-                className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors ${
-                  errors.threshold ? "border-red-500" : "border-gray-300 hover:border-gray-400"
+                className={`w-full border px-3 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                  errors.threshold ? 'border-red-500' : 'border-gray-300'
                 }`}
                 placeholder="0"
                 min="0"
               />
-              {errors.threshold && <p className="mt-2 text-sm text-red-600 flex items-center">
-                <svg className="h-4 w-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                </svg>
-                {errors.threshold}
-              </p>}
+              {errors.threshold && <p className="text-red-500 text-sm mt-1">{errors.threshold}</p>}
             </div>
           </div>
-          
-          <div className="pt-4 flex justify-end space-x-3 border-t border-gray-100">
+
+          {/* Upload de photo */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Photo du matériel
+            </label>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handlePhotoChange}
+              className="w-full border border-gray-300 px-3 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            {photo && (
+              <p className="text-green-600 text-sm mt-1">
+                ✓ {photo.name} sélectionné
+              </p>
+            )}
+          </div>
+
+          {/* Spécifications dynamiques */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-sm font-medium text-gray-700">
+                Spécifications techniques
+              </label>
+              <button
+                type="button"
+                onClick={debugSpecs}
+                className="text-xs text-blue-600 hover:text-blue-800"
+              >
+                🔍 Debug
+              </button>
+            </div>
+            
+            <div className="flex gap-2 mb-3">
+              <input
+                type="text"
+                placeholder="Clé (ex: Marque)"
+                value={newSpec.key}
+                onChange={(e) => setNewSpec({ ...newSpec, key: e.target.value })}
+                className="flex-1 border border-gray-300 px-3 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleAddSpec();
+                  }
+                }}
+              />
+              <input
+                type="text"
+                placeholder="Valeur (ex: Epson)"
+                value={newSpec.value}
+                onChange={(e) => setNewSpec({ ...newSpec, value: e.target.value })}
+                className="flex-1 border border-gray-300 px-3 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleAddSpec();
+                  }
+                }}
+              />
+              <button
+                type="button"
+                onClick={handleAddSpec}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+                disabled={!newSpec.key.trim() || !newSpec.value.trim()}
+              >
+                +
+              </button>
+            </div>
+            
+            {errors.spec && (
+              <p className="text-red-500 text-sm mb-2">{errors.spec}</p>
+            )}
+            
+            <div className="space-y-2 max-h-32 overflow-y-auto border border-gray-200 rounded-lg p-3 bg-gray-50">
+              {Object.entries(formData.specifications).length > 0 ? (
+                Object.entries(formData.specifications).map(([key, value]) => (
+                  <div
+                    key={key}
+                    className="flex justify-between items-center bg-white px-3 py-2 rounded-lg text-sm border border-gray-200"
+                  >
+                    <span className="text-gray-700">
+                      <strong className="text-blue-600">{key}:</strong> {String(value)}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveSpec(key)}
+                      className="text-red-500 hover:text-red-700 focus:outline-none ml-2"
+                    >
+                      ✖
+                    </button>
+                  </div>
+                ))
+              ) : (
+                <p className="text-gray-500 text-sm text-center py-2">
+                  Aucune spécification ajoutée
+                </p>
+              )}
+            </div>
+            
+            {Object.keys(formData.specifications).length > 0 && (
+              <p className="text-xs text-gray-500 mt-2 text-center">
+                {Object.keys(formData.specifications).length} spécification(s) ajoutée(s)
+              </p>
+            )}
+          </div>
+
+          {/* Boutons */}
+          <div className="flex justify-end space-x-3 pt-4 border-t">
             <button
               type="button"
               onClick={handleClose}
-              className="px-5 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium text-sm"
               disabled={submitting}
+              className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-500 disabled:opacity-50"
             >
               Annuler
             </button>
             <button
               type="submit"
               disabled={submitting}
-              className="px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-70 disabled:cursor-not-allowed font-medium text-sm flex items-center justify-center shadow-sm hover:shadow-md"
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 flex items-center"
             >
               {submitting ? (
                 <>
@@ -172,18 +383,19 @@ const AddStockForm = ({ isOpen, onClose, onStockAdded }) => {
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                   </svg>
-                  En cours...
+                  Ajout...
                 </>
               ) : (
-                <>
-                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
-                  </svg>
-                  Ajouter le produit
-                </>
+                "Ajouter le matériel"
               )}
             </button>
           </div>
+
+          {errors.submit && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+              <p className="text-red-700 text-sm text-center">{errors.submit}</p>
+            </div>
+          )}
         </form>
       </div>
     </div>
