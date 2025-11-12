@@ -27,6 +27,8 @@ app.use("/api/events", eventRoutes);
 app.use("/api/emprunts", empruntRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/students', studentRoutes);
+app.use("/uploads", express.static("uploads"));
+
 
 
 app.get('/', (req, res) => res.send('API stocks fonctionne'));
