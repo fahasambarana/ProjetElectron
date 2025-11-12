@@ -19,8 +19,10 @@ const validateObjectId = (req, res, next) => {
 
 // ✅ ROUTES STATIQUES EN PREMIER (TRÈS IMPORTANT)
 router.get('/count', empruntController.countEmprunts);
+router.get('/retard', empruntController.countEmpruntsEnRetard); // Nouvelle route
 router.get('/stats/count', empruntController.countEmprunts);
 router.get('/stats/statistiques', empruntController.getStats);
+router.get('/search', empruntController.searchEmprunts);
 
 // ✅ ROUTES SANS PARAMÈTRES
 router.get('/', empruntController.getEmprunts);

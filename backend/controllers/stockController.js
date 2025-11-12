@@ -1,154 +1,277 @@
-const Stock = require("../models/StockModel"); 
-const fs = require("fs");
+const mongoose = require("mongoose");
+const Stock = require("../models/StockModel");
 
-// ✅ CREATE — Ajouter un stock avec image (CORRIGÉ)
-exports.createStock = async (req, res) => {
+// Compter tous les stocks
+exports.countStocks = async (req, res) => {
   try {
-    const { name, type, stock, threshold, specifications } = req.body;
-
-    const photo = req.file ? req.file.path : null;
-
-    // Gérer les spécifications si envoyées en JSON stringifié
-    let specs = {};
-    if (specifications) {
-      try {
-        specs = JSON.parse(specifications);
-      } catch (parseError) {
-        console.warn("Erreur parsing specifications:", parseError);
-      }
-    }
-
-    // ✅ CORRECTION : Inclure le champ 'type' qui est requis
-    const newStock = new Stock({ 
-      name, 
-      type, // ✅ Maintenant inclus
-      stock: Number(stock),
-      threshold: Number(threshold),
-      specifications: specs,
-      photo 
-    });
+    console.log("🔢 Début comptage stocks");
     
-    const saved = await newStock.save();
-
-    res.status(201).json({
-      message: "Stock ajouté avec succès ✅",
-      data: saved,
+    const count = await Stock.countDocuments();
+    
+    console.log(`✅ Nombre de stocks trouvés: ${count}`);
+    
+    res.status(200).json({
+      success: true,
+      count: count,
+      message: `Nombre total de stocks récupéré avec succès`
     });
   } catch (error) {
-    console.error("Erreur création stock:", error);
-    
-    if (error.name === 'ValidationError') {
-      return res.status(400).json({ 
-        message: "Données invalides", 
-        errors: error.errors 
-      });
-    }
-    
-    res.status(500).json({ message: "Erreur serveur" });
+    console.error('❌ Erreur comptage stocks:', error);
+    res.status(500).json({
+      success: false,
+      message: "Erreur serveur lors du comptage des stocks",
+      error: error.message
+    });
   }
 };
 
-// ✅ UPDATE — Modifier un stock + remplacer l'ancienne image (CORRIGÉ)
-exports.updateStock = async (req, res) => {
-  try {
-    const { name, type, stock, threshold, specifications } = req.body;
-
-    const existingStock = await Stock.findById(req.params.id);
-    if (!existingStock) return res.status(404).json({ message: "Stock introuvable" });
-
-    // Gérer les spécifications
-    let specs = existingStock.specifications;
-    if (specifications) {
-      try {
-        specs = JSON.parse(specifications);
-      } catch (parseError) {
-        console.warn("Erreur parsing specifications:", parseError);
-      }
-    }
-
-    // Si une nouvelle image est uploadée → supprimer l'ancienne
-    if (req.file && existingStock.photo && fs.existsSync(existingStock.photo)) {
-      fs.unlinkSync(existingStock.photo);
-    }
-
-    // ✅ CORRECTION : Mettre à jour tous les champs requis
-    existingStock.name = name ?? existingStock.name;
-    existingStock.type = type ?? existingStock.type; // ✅ Maintenant inclus
-    existingStock.stock = stock !== undefined ? Number(stock) : existingStock.stock;
-    existingStock.threshold = threshold !== undefined ? Number(threshold) : existingStock.threshold;
-    existingStock.specifications = specs;
-    existingStock.photo = req.file ? req.file.path : existingStock.photo;
-
-    const updated = await existingStock.save();
-
-    res.json({
-      message: "Stock modifié ✅",
-      data: updated,
-    });
-  } catch (error) {
-    console.error("Erreur modification stock:", error);
-    
-    if (error.name === 'ValidationError') {
-      return res.status(400).json({ 
-        message: "Données invalides", 
-        errors: error.errors 
-      });
-    }
-    
-    res.status(500).json({ message: "Erreur serveur" });
-  }
-};
-
-// ✅ READ — Tous les stocks
+// Obtenir tous les stocks
 exports.getStocks = async (req, res) => {
   try {
     const stocks = await Stock.find().sort({ createdAt: -1 });
-    res.json(stocks);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: "Erreur serveur" });
+
+    res.json({
+      success: true,
+      count: stocks.length,
+      data: stocks,
+    });
+  } catch (err) {
+    console.error("Erreur récupération stocks:", err);
+    res.status(500).json({
+      success: false,
+      message: "Erreur lors du chargement des stocks",
+      error: err.message,
+    });
   }
 };
 
-// ✅ READ — Stock par ID
-exports.getStockById = async (req, res) => {
+// Créer un nouveau stock
+exports.createStock = async (req, res) => {
   try {
-    const stock = await Stock.findById(req.params.id);
-    if (!stock) return res.status(404).json({ message: "Stock introuvable" });
+    const { name, description, stock, seuil } = req.body;
 
-    res.json(stock);
-  } catch (error) {
-    res.status(500).json({ message: "Erreur serveur" });
-  }
-};
-
-// ✅ DELETE — Supprimer stock + supprimer photo du disque
-exports.deleteStock = async (req, res) => {
-  try {
-    const stock = await Stock.findById(req.params.id);
-    if (!stock) return res.status(404).json({ message: "Stock introuvable" });
-
-    // Supprimer la photo du serveur si elle existe
-    if (stock.photo && fs.existsSync(stock.photo)) {
-      fs.unlinkSync(stock.photo);
+    // Validation des champs obligatoires
+    if (!name || stock === undefined) {
+      return res.status(400).json({
+        success: false,
+        message: "Nom et stock sont obligatoires",
+      });
     }
 
-    await stock.deleteOne();
+    const nouveauStock = await Stock.create({
+      name,
+      description,
+      stock,
+      seuil: seuil || 5,
+    });
 
-    res.json({ message: "Stock supprimé ✅" });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: "Erreur serveur" });
+    res.status(201).json({
+      success: true,
+      message: "Stock créé avec succès",
+      data: nouveauStock,
+    });
+  } catch (err) {
+    console.error("Erreur création stock:", err);
+    res.status(500).json({
+      success: false,
+      message: "Erreur lors de la création du stock",
+      error: err.message,
+    });
   }
 };
 
-// ✅ Compter les stocks
-exports.countStocks = async (req, res) => {
+// Récupérer un stock par ID
+exports.getStockById = async (req, res) => {
   try {
-    const count = await Stock.countDocuments();
-    res.json({ count });
+    const { id } = req.params;
+
+    if (!id) {
+      return res.status(400).json({
+        success: false,
+        message: "ID stock requis",
+      });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        message: "ID stock invalide",
+      });
+    }
+
+    const stock = await Stock.findById(id);
+    if (!stock) {
+      return res.status(404).json({
+        success: false,
+        message: "Stock non trouvé",
+      });
+    }
+
+    res.json({
+      success: true,
+      data: stock,
+    });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Erreur serveur" });
+    console.error("Erreur récupération stock:", err);
+    res.status(500).json({
+      success: false,
+      message: "Erreur lors de la récupération du stock",
+      error: err.message,
+    });
+  }
+};
+
+// Mettre à jour un stock
+exports.updateStock = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, description, stock, seuil } = req.body;
+
+    if (!id) {
+      return res.status(400).json({
+        success: false,
+        message: "ID stock requis",
+      });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        message: "ID stock invalide",
+      });
+    }
+
+    const existingStock = await Stock.findById(id);
+    if (!existingStock) {
+      return res.status(404).json({
+        success: false,
+        message: "Stock non trouvé",
+      });
+    }
+
+    const updatedStock = await Stock.findByIdAndUpdate(
+      id,
+      { name, description, stock, seuil },
+      { new: true, runValidators: true }
+    );
+
+    res.json({
+      success: true,
+      message: "Stock modifié avec succès",
+      data: updatedStock,
+    });
+  } catch (err) {
+    console.error("Erreur modification stock:", err);
+    res.status(500).json({
+      success: false,
+      message: "Erreur lors de la modification du stock",
+      error: err.message,
+    });
+  }
+};
+
+// Supprimer un stock
+exports.deleteStock = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!id) {
+      return res.status(400).json({
+        success: false,
+        message: "ID stock requis",
+      });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        message: "ID stock invalide",
+      });
+    }
+
+    const stock = await Stock.findById(id);
+    if (!stock) {
+      return res.status(404).json({
+        success: false,
+        message: "Stock non trouvé",
+      });
+    }
+
+    await Stock.findByIdAndDelete(id);
+
+    res.json({
+      success: true,
+      message: "Stock supprimé avec succès",
+    });
+  } catch (err) {
+    console.error("Erreur suppression stock:", err);
+    res.status(500).json({
+      success: false,
+      message: "Erreur lors de la suppression",
+      error: err.message,
+    });
+  }
+};
+
+// Recherche de stocks
+exports.searchStocks = async (req, res) => {
+  try {
+    const { search } = req.query;
+    
+    if (!search) {
+      return res.status(400).json({
+        success: false,
+        message: "Terme de recherche requis"
+      });
+    }
+
+    const stocks = await Stock.find({
+      $or: [
+        { name: { $regex: search, $options: 'i' } },
+        { description: { $regex: search, $options: 'i' } }
+      ]
+    }).sort({ createdAt: -1 });
+
+    res.json({
+      success: true,
+      count: stocks.length,
+      data: stocks,
+    });
+  } catch (error) {
+    console.error("Erreur recherche stocks:", error);
+    res.status(500).json({
+      success: false,
+      message: "Erreur lors de la recherche des stocks",
+      error: error.message
+    });
+  }
+};
+
+// Statistiques des stocks
+exports.getStats = async (req, res) => {
+  try {
+    const totalStocks = await Stock.countDocuments();
+    const stocksFaibles = await Stock.countDocuments({
+      stock: { $lte: 5 } // Stocks à 5 ou moins
+    });
+    const stocksDisponibles = await Stock.countDocuments({
+      stock: { $gt: 0 }
+    });
+
+    res.json({
+      success: true,
+      data: {
+        totalStocks,
+        stocksFaibles,
+        stocksDisponibles,
+      },
+    });
+  } catch (err) {
+    console.error("Erreur statistiques stocks:", err);
+    res.status(500).json({
+      success: false,
+      message: "Erreur lors de la récupération des statistiques",
+      error: err.message,
+    });
   }
 };

@@ -1,4 +1,4 @@
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
 const Emprunt = require("../models/EmpruntModel");
 const Stock = require("../models/StockModel");
 const AlerteService = require("../services/alertServices");
@@ -19,18 +19,19 @@ exports.createEmprunt = async (req, res) => {
 
     // Validation des champs obligatoires
     if (!matricule || !prenoms || !dateEmprunt || !materiel) {
-      return res.status(400).json({ 
-        success: false, 
-        message: "Matricule, prénoms, date d'emprunt et matériel sont obligatoires" 
+      return res.status(400).json({
+        success: false,
+        message:
+          "Matricule, prénoms, date d'emprunt et matériel sont obligatoires",
       });
     }
 
     // Vérifier si le matériel existe
     const stockMateriel = await Stock.findById(materiel);
     if (!stockMateriel) {
-      return res.status(404).json({ 
-        success: false, 
-        message: "Matériel non trouvé" 
+      return res.status(404).json({
+        success: false,
+        message: "Matériel non trouvé",
       });
     }
 
@@ -54,11 +55,14 @@ exports.createEmprunt = async (req, res) => {
       dateRetour,
       niveau,
       parcours,
-      heureSortie: heureSortie || new Date().toTimeString().split(' ')[0].substring(0, 5),
+      heureSortie:
+        heureSortie || new Date().toTimeString().split(" ")[0].substring(0, 5),
       materiel,
     });
 
-    const empruntPeuple = await Emprunt.findById(emprunt._id).populate("materiel");
+    const empruntPeuple = await Emprunt.findById(emprunt._id).populate(
+      "materiel"
+    );
 
     res.status(201).json({
       success: true,
@@ -101,36 +105,36 @@ exports.getEmprunts = async (req, res) => {
 exports.getEmpruntById = async (req, res) => {
   try {
     const { id } = req.params;
-    
+
     console.log("🔍 Recherche emprunt avec ID:", id);
 
     if (!id) {
-      return res.status(400).json({ 
-        success: false, 
-        message: "ID emprunt requis" 
+      return res.status(400).json({
+        success: false,
+        message: "ID emprunt requis",
       });
     }
 
     // 🔥 VALIDATION ObjectId AVANT la recherche
     if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({ 
-        success: false, 
+      return res.status(400).json({
+        success: false,
         message: "ID emprunt invalide",
-        error: `L'ID "${id}" n'est pas un format valide`
+        error: `L'ID "${id}" n'est pas un format valide`,
       });
     }
 
     const emprunt = await Emprunt.findById(id).populate("materiel");
     if (!emprunt) {
-      return res.status(404).json({ 
-        success: false, 
-        message: "Emprunt non trouvé" 
+      return res.status(404).json({
+        success: false,
+        message: "Emprunt non trouvé",
       });
     }
 
-    res.json({ 
-      success: true, 
-      data: emprunt 
+    res.json({
+      success: true,
+      data: emprunt,
     });
   } catch (err) {
     console.error("❌ Erreur récupération emprunt:", err);
@@ -160,25 +164,25 @@ exports.updateEmprunt = async (req, res) => {
     } = req.body;
 
     if (!id) {
-      return res.status(400).json({ 
-        success: false, 
-        message: "ID emprunt requis" 
+      return res.status(400).json({
+        success: false,
+        message: "ID emprunt requis",
       });
     }
 
     // Validation ObjectId
     if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({ 
-        success: false, 
-        message: "ID emprunt invalide" 
+      return res.status(400).json({
+        success: false,
+        message: "ID emprunt invalide",
       });
     }
 
     const existingEmprunt = await Emprunt.findById(id);
     if (!existingEmprunt) {
-      return res.status(404).json({ 
-        success: false, 
-        message: "Emprunt non trouvé" 
+      return res.status(404).json({
+        success: false,
+        message: "Emprunt non trouvé",
       });
     }
 
@@ -197,9 +201,9 @@ exports.updateEmprunt = async (req, res) => {
       if (!heureEntree) {
         const nouveauMateriel = await Stock.findById(materiel);
         if (!nouveauMateriel) {
-          return res.status(404).json({ 
-            success: false, 
-            message: "Nouveau matériel non trouvé" 
+          return res.status(404).json({
+            success: false,
+            message: "Nouveau matériel non trouvé",
           });
         }
         if (nouveauMateriel.stock <= 0) {
@@ -239,11 +243,10 @@ exports.updateEmprunt = async (req, res) => {
     }
     // Si heureEntree existe déjà et dateRetourEffective n'est pas fournie, laisser la valeur existante
 
-    const updatedEmprunt = await Emprunt.findByIdAndUpdate(
-      id,
-      updateData,
-      { new: true, runValidators: true }
-    ).populate("materiel");
+    const updatedEmprunt = await Emprunt.findByIdAndUpdate(id, updateData, {
+      new: true,
+      runValidators: true,
+    }).populate("materiel");
 
     res.json({
       success: true,
@@ -270,32 +273,32 @@ exports.marquerCommeRendu = async (req, res) => {
     console.log("ID:", id);
 
     if (!id) {
-      return res.status(400).json({ 
-        success: false, 
-        message: "ID emprunt requis" 
+      return res.status(400).json({
+        success: false,
+        message: "ID emprunt requis",
       });
     }
 
     // Validation ObjectId
     if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({ 
-        success: false, 
-        message: "ID emprunt invalide" 
+      return res.status(400).json({
+        success: false,
+        message: "ID emprunt invalide",
       });
     }
 
     const emprunt = await Emprunt.findById(id);
     if (!emprunt) {
-      return res.status(404).json({ 
-        success: false, 
-        message: "Emprunt non trouvé" 
+      return res.status(404).json({
+        success: false,
+        message: "Emprunt non trouvé",
       });
     }
 
     if (emprunt.heureEntree) {
-      return res.status(400).json({ 
-        success: false, 
-        message: "Cet emprunt a déjà été marqué comme rendu" 
+      return res.status(400).json({
+        success: false,
+        message: "Cet emprunt a déjà été marqué comme rendu",
       });
     }
 
@@ -309,17 +312,19 @@ exports.marquerCommeRendu = async (req, res) => {
 
     // Préparer les données de mise à jour
     const updateData = {
-      heureEntree: heureEntree || new Date().toTimeString().split(' ')[0].substring(0, 5),
-      dateRetourEffective: dateRetourEffective ? new Date(dateRetourEffective) : new Date()
+      heureEntree:
+        heureEntree || new Date().toTimeString().split(" ")[0].substring(0, 5),
+      dateRetourEffective: dateRetourEffective
+        ? new Date(dateRetourEffective)
+        : new Date(),
     };
 
     console.log("📝 Données de mise à jour:", updateData);
 
-    const empruntRendu = await Emprunt.findByIdAndUpdate(
-      id,
-      updateData,
-      { new: true, runValidators: true }
-    ).populate("materiel");
+    const empruntRendu = await Emprunt.findByIdAndUpdate(id, updateData, {
+      new: true,
+      runValidators: true,
+    }).populate("materiel");
 
     console.log("✅ Emprunt mis à jour avec succès");
 
@@ -328,21 +333,23 @@ exports.marquerCommeRendu = async (req, res) => {
       await AlerteService.resoudreAlerte(id);
       console.log("✅ Alerte résolue si existante");
     } catch (alerteError) {
-      console.warn("⚠️ Aucune alerte à résoudre ou erreur:", alerteError.message);
+      console.warn(
+        "⚠️ Aucune alerte à résoudre ou erreur:",
+        alerteError.message
+      );
     }
 
     res.json({
       success: true,
-      message: 'Matériel marqué comme rendu avec succès',
-      data: empruntRendu
+      message: "Matériel marqué comme rendu avec succès",
+      data: empruntRendu,
     });
-
   } catch (error) {
     console.error("❌ Erreur marquer comme rendu:", error);
     res.status(500).json({
       success: false,
-      message: 'Erreur lors du marquage comme rendu',
-      error: error.message
+      message: "Erreur lors du marquage comme rendu",
+      error: error.message,
     });
   }
 };
@@ -351,27 +358,27 @@ exports.marquerCommeRendu = async (req, res) => {
 exports.deleteEmprunt = async (req, res) => {
   try {
     const { id } = req.params;
-    
+
     if (!id) {
-      return res.status(400).json({ 
-        success: false, 
-        message: "ID emprunt requis" 
+      return res.status(400).json({
+        success: false,
+        message: "ID emprunt requis",
       });
     }
 
     // Validation ObjectId
     if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({ 
-        success: false, 
-        message: "ID emprunt invalide" 
+      return res.status(400).json({
+        success: false,
+        message: "ID emprunt invalide",
       });
     }
 
     const emprunt = await Emprunt.findById(id);
     if (!emprunt) {
-      return res.status(404).json({ 
-        success: false, 
-        message: "Emprunt non trouvé" 
+      return res.status(404).json({
+        success: false,
+        message: "Emprunt non trouvé",
       });
     }
 
@@ -408,27 +415,22 @@ exports.deleteEmprunt = async (req, res) => {
   }
 };
 
-// Compter tous les emprunts
+// Compter tous les emprunts - UNE SEULE FOIS
 exports.countEmprunts = async (req, res) => {
   try {
-    const total = await Emprunt.countDocuments();
-    const enCours = await Emprunt.countDocuments({ heureEntree: { $exists: false } });
-    const rendus = await Emprunt.countDocuments({ heureEntree: { $exists: true } });
+    const count = await Emprunt.countDocuments();
 
-    res.json({ 
-      success: true, 
-      data: {
-        total,
-        enCours,
-        rendus
-      }
+    res.status(200).json({
+      success: true,
+      count: count,
+      message: `Nombre total d'emprunts récupéré avec succès`
     });
-  } catch (err) {
-    console.error("Erreur comptage emprunts:", err);
+  } catch (error) {
+    console.error('Erreur comptage emprunts:', error);
     res.status(500).json({
       success: false,
-      message: "Erreur lors du comptage",
-      error: err.message,
+      message: "Erreur serveur lors du comptage des emprunts",
+      error: error.message
     });
   }
 };
@@ -451,11 +453,11 @@ exports.getStats = async (req, res) => {
           from: "stocks",
           localField: "materiel",
           foreignField: "_id",
-          as: "materielInfo"
-        }
+          as: "materielInfo",
+        },
       },
       {
-        $unwind: "$materielInfo"
+        $unwind: "$materielInfo",
       },
       {
         $group: {
@@ -463,16 +465,16 @@ exports.getStats = async (req, res) => {
           nomMateriel: { $first: "$materielInfo.name" },
           total: { $sum: 1 },
           enCours: {
-            $sum: { $cond: [{ $eq: ["$heureEntree", null] }, 1, 0] }
+            $sum: { $cond: [{ $eq: ["$heureEntree", null] }, 1, 0] },
           },
           rendus: {
-            $sum: { $cond: [{ $ne: ["$heureEntree", null] }, 1, 0] }
-          }
-        }
+            $sum: { $cond: [{ $ne: ["$heureEntree", null] }, 1, 0] },
+          },
+        },
       },
       {
-        $sort: { total: -1 }
-      }
+        $sort: { total: -1 },
+      },
     ]);
 
     res.json({
@@ -481,7 +483,7 @@ exports.getStats = async (req, res) => {
         totalEmprunts,
         empruntsEnCours,
         empruntsRendus,
-        statsMateriel
+        statsMateriel,
       },
     });
   } catch (err) {
@@ -495,20 +497,62 @@ exports.getStats = async (req, res) => {
 };
 
 // Recherche avancée d'emprunts
-exports.countEmprunts = async (req, res) => {
+exports.searchEmprunts = async (req, res) => {
   try {
-    const count = await Emprunt.countDocuments();
+    const { search } = req.query;
     
+    if (!search) {
+      return res.status(400).json({
+        success: false,
+        message: "Terme de recherche requis"
+      });
+    }
+
+    const emprunts = await Emprunt.find({
+      $or: [
+        { matricule: { $regex: search, $options: 'i' } },
+        { prenoms: { $regex: search, $options: 'i' } },
+        { niveau: { $regex: search, $options: 'i' } },
+        { parcours: { $regex: search, $options: 'i' } }
+      ]
+    }).populate("materiel").sort({ createdAt: -1 });
+
+    res.json({
+      success: true,
+      count: emprunts.length,
+      data: emprunts,
+    });
+  } catch (error) {
+    console.error("Erreur recherche emprunts:", error);
+    res.status(500).json({
+      success: false,
+      message: "Erreur lors de la recherche des emprunts",
+      error: error.message
+    });
+  }
+};
+
+// Compter les emprunts en retard - CORRIGÉ
+exports.countEmpruntsEnRetard = async (req, res) => {
+  try {
+    const aujourdHui = new Date();
+    
+    // CORRECTION: Utiliser les champs existants de votre modèle
+    const count = await Emprunt.countDocuments({
+      dateRetour: { $lt: aujourdHui }, // dateRetour au lieu de dateRetourPrevue
+      heureEntree: { $exists: false } // pas encore rendu
+    });
+
     res.status(200).json({
       success: true,
       count: count,
-      message: `Nombre total d'emprunts récupéré avec succès`
+      message: `Nombre d'emprunts en retard récupéré avec succès`
     });
   } catch (error) {
-    console.error('Erreur comptage emprunts:', error);
+    console.error('Erreur comptage emprunts en retard:', error);
     res.status(500).json({
       success: false,
-      message: "Erreur serveur lors du comptage des emprunts",
+      message: "Erreur serveur lors du comptage des emprunts en retard",
       error: error.message
     });
   }
