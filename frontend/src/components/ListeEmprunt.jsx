@@ -130,39 +130,47 @@ export default function EmpruntList() {
   }, []);
 
   // 🔥 CORRECTION : Fonction améliorée pour détecter tous les emprunts en retard
-  const calculerEmpruntsEnRetardFallback = useCallback((empruntsList) => {
-    const aujourdhui = new Date();
-    const empruntsRetard = empruntsList.filter((emprunt) => {
-      if (emprunt.heureEntree) return false; // Déjà rendu
-      if (!emprunt.dateRetour) return false; // Pas de date de retour définie
+  const calculerEmpruntsEnRetardFallback = useCallback(
+    (empruntsList) => {
+      const aujourdhui = new Date();
+      const empruntsRetard = empruntsList.filter((emprunt) => {
+        if (emprunt.heureEntree) return false; // Déjà rendu
+        if (!emprunt.dateRetour) return false; // Pas de date de retour définie
 
-      const joursRetard = calculerJoursRetard(emprunt.dateRetour);
-      return joursRetard >= 10; // 10 jours ou plus de retard
-    });
+        const joursRetard = calculerJoursRetard(emprunt.dateRetour);
+        return joursRetard >= 10; // 10 jours ou plus de retard
+      });
 
-    console.log(`🔍 Fallback: ${empruntsRetard.length} emprunts en retard de plus de 10 jours`);
-    
-    // Trier par jours de retard décroissant
-    empruntsRetard.sort((a, b) => {
-      const retardA = calculerJoursRetard(a.dateRetour);
-      const retardB = calculerJoursRetard(b.dateRetour);
-      return retardB - retardA;
-    });
+      console.log(
+        `🔍 Fallback: ${empruntsRetard.length} emprunts en retard de plus de 10 jours`
+      );
 
-    setEmpruntsEnRetard(empruntsRetard);
-  }, [calculerJoursRetard]);
+      // Trier par jours de retard décroissant
+      empruntsRetard.sort((a, b) => {
+        const retardA = calculerJoursRetard(a.dateRetour);
+        const retardB = calculerJoursRetard(b.dateRetour);
+        return retardB - retardA;
+      });
+
+      setEmpruntsEnRetard(empruntsRetard);
+    },
+    [calculerJoursRetard]
+  );
 
   // 🔥 CORRECTION : Fonction pour obtenir les informations d'un emprunt en retard
-  const getInfosEmpruntRetard = useCallback((emprunt) => {
-    return {
-      _id: emprunt._id,
-      matricule: emprunt.matricule,
-      prenoms: emprunt.prenoms,
-      materiel: getMaterielName(emprunt.materiel),
-      dateRetourPrevue: emprunt.dateRetour,
-      joursRetard: calculerJoursRetard(emprunt.dateRetour),
-    };
-  }, [getMaterielName, calculerJoursRetard]);
+  const getInfosEmpruntRetard = useCallback(
+    (emprunt) => {
+      return {
+        _id: emprunt._id,
+        matricule: emprunt.matricule,
+        prenoms: emprunt.prenoms,
+        materiel: getMaterielName(emprunt.materiel),
+        dateRetourPrevue: emprunt.dateRetour,
+        joursRetard: calculerJoursRetard(emprunt.dateRetour),
+      };
+    },
+    [getMaterielName, calculerJoursRetard]
+  );
 
   const fetchEmprunts = useCallback(async () => {
     try {
@@ -244,61 +252,69 @@ export default function EmpruntList() {
   }, [emprunts, calculerEmpruntsEnRetardFallback]);
 
   // 🔥 NOUVEAU : Fonction optimisée pour mettre à jour automatiquement les données
-  const updateEmpruntsData = useCallback((updatedEmprunt) => {
-    setEmprunts(prev => {
-      const newEmprunts = prev.map(e => 
-        e._id === updatedEmprunt._id ? updatedEmprunt : e
-      );
-      
-      // Mettre à jour immédiatement les alertes de retard
-      const empruntsNonRendus = newEmprunts.filter(e => !e.heureEntree && e.dateRetour);
-      const empruntsRetard = empruntsNonRendus.filter(emprunt => {
-        const joursRetard = calculerJoursRetard(emprunt.dateRetour);
-        return joursRetard >= 10;
+  const updateEmpruntsData = useCallback(
+    (updatedEmprunt) => {
+      setEmprunts((prev) => {
+        const newEmprunts = prev.map((e) =>
+          e._id === updatedEmprunt._id ? updatedEmprunt : e
+        );
+
+        // Mettre à jour immédiatement les alertes de retard
+        const empruntsNonRendus = newEmprunts.filter(
+          (e) => !e.heureEntree && e.dateRetour
+        );
+        const empruntsRetard = empruntsNonRendus.filter((emprunt) => {
+          const joursRetard = calculerJoursRetard(emprunt.dateRetour);
+          return joursRetard >= 10;
+        });
+
+        // Trier par jours de retard décroissant
+        empruntsRetard.sort((a, b) => {
+          const retardA = calculerJoursRetard(a.dateRetour);
+          const retardB = calculerJoursRetard(b.dateRetour);
+          return retardB - retardA;
+        });
+
+        setEmpruntsEnRetard(empruntsRetard);
+
+        return newEmprunts;
       });
-      
-      // Trier par jours de retard décroissant
-      empruntsRetard.sort((a, b) => {
-        const retardA = calculerJoursRetard(a.dateRetour);
-        const retardB = calculerJoursRetard(b.dateRetour);
-        return retardB - retardA;
-      });
-      
-      setEmpruntsEnRetard(empruntsRetard);
-      
-      return newEmprunts;
-    });
-  }, [calculerJoursRetard]);
+    },
+    [calculerJoursRetard]
+  );
 
   // 🔥 NOUVEAU : Fonction optimisée pour ajouter un emprunt
-  const addEmpruntData = useCallback((newEmprunt) => {
-    setEmprunts(prev => {
-      const newEmprunts = [newEmprunt, ...prev];
-      
-      // Vérifier si le nouvel emprunt est en retard
-      if (!newEmprunt.heureEntree && newEmprunt.dateRetour) {
-        const joursRetard = calculerJoursRetard(newEmprunt.dateRetour);
-        if (joursRetard >= 10) {
-          setEmpruntsEnRetard(prevRetard => {
-            const updatedRetard = [newEmprunt, ...prevRetard];
-            // Trier par jours de retard décroissant
-            return updatedRetard.sort((a, b) => {
-              const retardA = calculerJoursRetard(a.dateRetour);
-              const retardB = calculerJoursRetard(b.dateRetour);
-              return retardB - retardA;
+  const addEmpruntData = useCallback(
+    (newEmprunt) => {
+      setEmprunts((prev) => {
+        const newEmprunts = [newEmprunt, ...prev];
+
+        // Vérifier si le nouvel emprunt est en retard
+        if (!newEmprunt.heureEntree && newEmprunt.dateRetour) {
+          const joursRetard = calculerJoursRetard(newEmprunt.dateRetour);
+          if (joursRetard >= 10) {
+            setEmpruntsEnRetard((prevRetard) => {
+              const updatedRetard = [newEmprunt, ...prevRetard];
+              // Trier par jours de retard décroissant
+              return updatedRetard.sort((a, b) => {
+                const retardA = calculerJoursRetard(a.dateRetour);
+                const retardB = calculerJoursRetard(b.dateRetour);
+                return retardB - retardA;
+              });
             });
-          });
+          }
         }
-      }
-      
-      return newEmprunts;
-    });
-  }, [calculerJoursRetard]);
+
+        return newEmprunts;
+      });
+    },
+    [calculerJoursRetard]
+  );
 
   // 🔥 NOUVEAU : Fonction optimisée pour supprimer un emprunt
   const removeEmpruntData = useCallback((empruntId) => {
-    setEmprunts(prev => prev.filter(e => e._id !== empruntId));
-    setEmpruntsEnRetard(prev => prev.filter(e => e._id !== empruntId));
+    setEmprunts((prev) => prev.filter((e) => e._id !== empruntId));
+    setEmpruntsEnRetard((prev) => prev.filter((e) => e._id !== empruntId));
   }, []);
 
   // 🔥 CORRECTION : Fonction de test améliorée
@@ -311,8 +327,12 @@ export default function EmpruntList() {
       console.log(`📊 Emprunts non rendus: ${empruntsNonRendus.length}`);
 
       // 2. Vérifier les emprunts avec date de retour
-      const empruntsAvecDateRetour = empruntsNonRendus.filter(e => e.dateRetour);
-      console.log(`📅 Emprunts avec date de retour: ${empruntsAvecDateRetour.length}`);
+      const empruntsAvecDateRetour = empruntsNonRendus.filter(
+        (e) => e.dateRetour
+      );
+      console.log(
+        `📅 Emprunts avec date de retour: ${empruntsAvecDateRetour.length}`
+      );
 
       // 3. Vérifier les emprunts en retard de plus de 10 jours
       const aujourdhui = new Date();
@@ -321,27 +341,41 @@ export default function EmpruntList() {
         return joursRetard >= 10;
       });
 
-      console.log(`⚠️ Emprunts en retard (>10j): ${empruntsEnRetardTest.length}`);
-      
+      console.log(
+        `⚠️ Emprunts en retard (>10j): ${empruntsEnRetardTest.length}`
+      );
+
       // Détails de chaque emprunt en retard
       empruntsEnRetardTest.forEach((emp) => {
         const joursRetard = calculerJoursRetard(emp.dateRetour);
-        console.log(`   - ${emp.matricule}: ${joursRetard} jours de retard (date retour: ${formatDate(emp.dateRetour)})`);
+        console.log(
+          `   - ${
+            emp.matricule
+          }: ${joursRetard} jours de retard (date retour: ${formatDate(
+            emp.dateRetour
+          )})`
+        );
       });
 
       // 4. Vérifier les alertes du backend
       const res = await axios.get(
         "http://localhost:5000/api/alertes/alertes-actives"
       );
-      console.log(`🔔 Alertes actives du backend: ${res.data.count || res.data.data?.length || 0}`);
+      console.log(
+        `🔔 Alertes actives du backend: ${
+          res.data.count || res.data.data?.length || 0
+        }`
+      );
 
       alert(
         `🔍 TEST ALERTES TERMINÉ:\n\n` +
-        `📊 Total emprunts non rendus: ${empruntsNonRendus.length}\n` +
-        `📅 Avec date de retour: ${empruntsAvecDateRetour.length}\n` +
-        `⚠️  En retard (>10j): ${empruntsEnRetardTest.length}\n` +
-        `🔔 Alertes backend: ${res.data.count || res.data.data?.length || 0}\n\n` +
-        `Vérifiez la console pour les détails.`
+          `📊 Total emprunts non rendus: ${empruntsNonRendus.length}\n` +
+          `📅 Avec date de retour: ${empruntsAvecDateRetour.length}\n` +
+          `⚠️  En retard (>10j): ${empruntsEnRetardTest.length}\n` +
+          `🔔 Alertes backend: ${
+            res.data.count || res.data.data?.length || 0
+          }\n\n` +
+          `Vérifiez la console pour les détails.`
       );
     } catch (error) {
       console.error("❌ Erreur test alertes:", error);
@@ -360,85 +394,169 @@ export default function EmpruntList() {
   }, [emprunts, fetchAlertesRetard]);
 
   // 🔥 MODIFICATION : Fonctions de gestion des actions optimisées
-  const handleEmpruntAdded = useCallback(async (newEmprunt) => {
-    try {
-      const empruntData = newEmprunt.data || newEmprunt;
-      addEmpruntData(empruntData);
-      setShowModal(false);
-    } catch (error) {
-      console.error("Erreur handleEmpruntAdded:", error);
-    }
-  }, [addEmpruntData]);
+  const handleEmpruntAdded = useCallback(
+    async (newEmprunt) => {
+      try {
+        const empruntData = newEmprunt.data || newEmprunt;
+        addEmpruntData(empruntData);
+        setShowModal(false);
+      } catch (error) {
+        console.error("Erreur handleEmpruntAdded:", error);
+      }
+    },
+    [addEmpruntData]
+  );
 
-  const handleEmpruntUpdated = useCallback(async (updatedEmprunt) => {
-    try {
-      const empruntData = updatedEmprunt.data || updatedEmprunt;
-      updateEmpruntsData(empruntData);
-      setShowUpdateModal(false);
-      setSelectedEmprunt(null);
-    } catch (error) {
-      console.error("Erreur handleEmpruntUpdated:", error);
-    }
-  }, [updateEmpruntsData]);
+  const handleEmpruntUpdated = useCallback(
+    async (updatedEmprunt) => {
+      try {
+        const empruntData = updatedEmprunt.data || updatedEmprunt;
+        updateEmpruntsData(empruntData);
+        setShowUpdateModal(false);
+        setSelectedEmprunt(null);
+      } catch (error) {
+        console.error("Erreur handleEmpruntUpdated:", error);
+      }
+    },
+    [updateEmpruntsData]
+  );
 
   const handleEditClick = useCallback((emprunt) => {
     setSelectedEmprunt(emprunt);
     setShowUpdateModal(true);
   }, []);
 
-  const handleRenduClick = useCallback((empruntId) => {
-    const currentDateTime = getCurrentDateTime();
-    setShowDateConfirmation({
-      id: empruntId,
-      date: currentDateTime.date,
-      time: currentDateTime.time,
-      datetime: currentDateTime.datetime,
-    });
-  }, [getCurrentDateTime]);
+  const handleRenduClick = useCallback(
+    (emprunt) => {
+      if (!emprunt || !emprunt._id) {
+        console.error("❌ Emprunt ou ID manquant:", emprunt);
+        alert("Erreur: Impossible de trouver l'ID de l'emprunt");
+        return;
+      }
+
+      console.log("🖱️ Clic rendu sur emprunt ID:", emprunt._id);
+
+      const currentDateTime = getCurrentDateTime();
+      setSelectedEmprunt(emprunt);
+      setShowDateConfirmation({
+        id: emprunt._id, // 🔥 S'assurer que l'ID est bien défini
+        date: currentDateTime.date,
+        time: currentDateTime.time,
+        datetime: currentDateTime.datetime,
+      });
+    },
+    [getCurrentDateTime]
+  );
 
   const confirmRendu = useCallback(async () => {
-    if (!showDateConfirmation) return;
+  if (!showDateConfirmation || !showDateConfirmation.id) {
+    console.error("❌ Confirmation ou ID manquant:", showDateConfirmation);
+    alert("Erreur: ID d'emprunt manquant");
+    return;
+  }
 
-    try {
-      const payload = {
-        heureEntree: showDateConfirmation.time,
-        dateRetourEffective: showDateConfirmation.datetime,
-      };
+  try {
+    const empruntId = showDateConfirmation.id;
+    console.log("🔄 Marquage comme rendu, ID:", empruntId);
 
-      const res = await axios.put(
-        `http://localhost:5000/api/emprunts/rendu/${showDateConfirmation.id}`,
-        payload
-      );
-
-      const updatedEmprunt = res.data.data || res.data;
-
-      // 🔥 MODIFICATION : Mise à jour immédiate sans rechargement
-      updateEmpruntsData(updatedEmprunt);
-      setShowDateConfirmation(null);
-    } catch (err) {
-      console.error("Erreur marquage rendu:", err);
-      alert(
-        err.response?.data?.message || "Impossible de marquer le matériel rendu"
-      );
-      setShowDateConfirmation(null);
+    // 🔥 CORRECTION COMPLÈTE : Récupérer le type du matériel correctement
+    let materielType = "Autre";
+    
+    if (selectedEmprunt) {
+      console.log("🔍 Recherche du type de matériel...");
+      console.log("SelectedEmprunt:", selectedEmprunt);
+      console.log("Materiel:", selectedEmprunt.materiel);
+      
+      // Essayer différentes façons de récupérer le type
+      if (selectedEmprunt.materiel?.type) {
+        materielType = selectedEmprunt.materiel.type;
+      } else if (selectedEmprunt.type) {
+        materielType = selectedEmprunt.type;
+      } else if (selectedEmprunt.materielType) {
+        materielType = selectedEmprunt.materielType;
+      } else {
+        // Si on ne trouve pas le type, essayer de le déduire du nom
+        const materielName = getMaterielName(selectedEmprunt.materiel).toLowerCase();
+        if (materielName.includes('pc') || materielName.includes('ordinateur')) {
+          materielType = "PC";
+        } else if (materielName.includes('projecteur')) {
+          materielType = "Projecteur";
+        } else if (materielName.includes('switch')) {
+          materielType = "Switch";
+        } else if (materielName.includes('adaptateur')) {
+          materielType = "Adaptateur";
+        } else if (materielName.includes('routeur')) {
+          materielType = "Routeur";
+        }
+      }
     }
-  }, [showDateConfirmation, updateEmpruntsData]);
+
+    console.log("📋 Type de matériel déterminé:", materielType);
+
+    // 🔥 PAYLOAD COMPLET avec le type requis
+    const payload = {
+      type: materielType, // Champ requis par le modèle Stock
+      heureEntree: showDateConfirmation.time,
+      dateRetourEffective: showDateConfirmation.datetime,
+      // Inclure d'autres informations si nécessaire
+      materielId: selectedEmprunt?.materiel?._id || selectedEmprunt?.materiel,
+      action: "retour"
+    };
+
+    console.log("📤 Requête PUT vers:", `http://localhost:5000/api/emprunts/rendu/${empruntId}`);
+    console.log("📦 Payload complet:", payload);
+
+    const res = await axios.put(
+      `http://localhost:5000/api/emprunts/rendu/${empruntId}`,
+      payload
+    );
+
+    console.log("✅ Réponse du serveur:", res.data);
+
+    const updatedEmprunt = res.data.data || res.data;
+    updateEmpruntsData(updatedEmprunt);
+    setShowDateConfirmation(null);
+
+    alert("✅ Matériel marqué comme rendu avec succès");
+  } catch (err) {
+    console.error("❌ Erreur détaillée:", {
+      message: err.message,
+      response: err.response?.data,
+      status: err.response?.status,
+      url: err.config?.url
+    });
+
+    const errorMessage =
+      err.response?.data?.message ||
+      err.response?.data?.error ||
+      "Impossible de marquer le matériel rendu";
+
+    alert(`❌ Erreur: ${errorMessage}`);
+    setShowDateConfirmation(null);
+  }
+}, [showDateConfirmation, selectedEmprunt, updateEmpruntsData, getMaterielName]);
 
   const cancelRendu = useCallback(() => {
     setShowDateConfirmation(null);
   }, []);
 
-  const handleDeleteClick = useCallback(async (empruntId) => {
-    if (!window.confirm("Voulez-vous vraiment supprimer cet emprunt ?")) return;
-    try {
-      await axios.delete(`http://localhost:5000/api/emprunts/${empruntId}`);
-      // 🔥 MODIFICATION : Suppression immédiate sans rechargement
-      removeEmpruntData(empruntId);
-    } catch (err) {
-      console.error("Erreur suppression:", err);
-      alert(err.response?.data?.message || "Impossible de supprimer l'emprunt");
-    }
-  }, [removeEmpruntData]);
+  const handleDeleteClick = useCallback(
+    async (empruntId) => {
+      if (!window.confirm("Voulez-vous vraiment supprimer cet emprunt ?"))
+        return;
+      try {
+        await axios.delete(`http://localhost:5000/api/emprunts/${empruntId}`);
+        // 🔥 MODIFICATION : Suppression immédiate sans rechargement
+        removeEmpruntData(empruntId);
+      } catch (err) {
+        console.error("Erreur suppression:", err);
+        alert(
+          err.response?.data?.message || "Impossible de supprimer l'emprunt"
+        );
+      }
+    },
+    [removeEmpruntData]
+  );
 
   // 🔥 CORRECTION : Fonction améliorée pour vérifier manuellement les retards
   const verifierRetardsManuellement = useCallback(async () => {
@@ -459,7 +577,9 @@ export default function EmpruntList() {
   const forcerDetectionRetards = useCallback(() => {
     console.log("🔍 Forçage de la détection des retards...");
     calculerEmpruntsEnRetardFallback(emprunts);
-    alert(`🔍 Détection forcée terminée\n${empruntsEnRetard.length} emprunts en retard détectés`);
+    alert(
+      `🔍 Détection forcée terminée\n${empruntsEnRetard.length} emprunts en retard détectés`
+    );
   }, [emprunts, calculerEmpruntsEnRetardFallback, empruntsEnRetard]);
 
   // Fonction pour rafraîchir les données
@@ -475,26 +595,29 @@ export default function EmpruntList() {
   }, [fetchEmprunts]);
 
   // 🔥 CORRECTION : Fonction améliorée pour vérifier si un emprunt est en retard
-  const isEmpruntEnRetard = useCallback((emprunt) => {
-    if (emprunt.heureEntree) return false;
+  const isEmpruntEnRetard = useCallback(
+    (emprunt) => {
+      if (emprunt.heureEntree) return false;
 
-    // Vérifier d'abord dans les alertes existantes
-    const dansAlertes = empruntsEnRetard.some((alerte) => {
-      if (alerte.emprunt && alerte.emprunt._id === emprunt._id) return true;
-      if (alerte._id === emprunt._id) return true;
+      // Vérifier d'abord dans les alertes existantes
+      const dansAlertes = empruntsEnRetard.some((alerte) => {
+        if (alerte.emprunt && alerte.emprunt._id === emprunt._id) return true;
+        if (alerte._id === emprunt._id) return true;
+        return false;
+      });
+
+      if (dansAlertes) return true;
+
+      // Vérifier par calcul direct si pas dans les alertes
+      if (emprunt.dateRetour) {
+        const joursRetard = calculerJoursRetard(emprunt.dateRetour);
+        return joursRetard >= 10;
+      }
+
       return false;
-    });
-
-    if (dansAlertes) return true;
-
-    // Vérifier par calcul direct si pas dans les alertes
-    if (emprunt.dateRetour) {
-      const joursRetard = calculerJoursRetard(emprunt.dateRetour);
-      return joursRetard >= 10;
-    }
-
-    return false;
-  }, [empruntsEnRetard, calculerJoursRetard]);
+    },
+    [empruntsEnRetard, calculerJoursRetard]
+  );
 
   // Filtrer les emprunts
   const filteredEmprunts = useMemo(() => {
@@ -634,6 +757,12 @@ export default function EmpruntList() {
     if (!filteredEmprunts || filteredEmprunts.length === 0) return null;
 
     return filteredEmprunts.map((e) => {
+      // 🔥 Vérifier que l'emprunt a un ID valide
+      if (!e._id) {
+        console.warn("⚠️ Emprunt sans ID:", e);
+        return null;
+      }
+
       const estEnRetard = isEmpruntEnRetard(e);
       const dateRendu = getDateRendu(e);
       const nomAffiche = getNomOnly(e.prenoms);
@@ -709,7 +838,10 @@ export default function EmpruntList() {
           <td className="px-2 py-2 whitespace-nowrap text-right space-x-1">
             {!e.heureEntree && (
               <button
-                onClick={() => handleRenduClick(e._id)}
+                onClick={() => {
+                  console.log("🖱️ Bouton rendu cliqué pour emprunt:", e);
+                  handleRenduClick(e); // 🔥 CORRECTION : Passer l'objet emprunt complet, pas seulement l'ID
+                }}
                 className="text-green-600 hover:text-green-900 p-1 rounded hover:bg-green-50 inline-flex items-center"
                 title="Marquer comme rendu"
               >
@@ -746,6 +878,7 @@ export default function EmpruntList() {
     handleDeleteClick,
   ]);
 
+  // 🔥 PARTIE RETURN MANQUANTE - AJOUTÉE ICI
   return (
     <div className="max-w-7xl mx-auto p-6 bg-white rounded-xl shadow-md border border-gray-100">
       {/* Modal de confirmation de rendu */}
@@ -805,7 +938,8 @@ export default function EmpruntList() {
                 ⚠️ Alerte: Emprunts en retard
               </h3>
               <p className="text-red-700 mb-3">
-                {empruntsEnRetard.length} emprunt(s) non rendu(s) depuis 10 jours ou plus :
+                {empruntsEnRetard.length} emprunt(s) non rendu(s) depuis 10
+                jours ou plus :
               </p>
               <div className="space-y-2 max-h-48 overflow-y-auto">
                 {empruntsEnRetard.map((emprunt, index) => {
