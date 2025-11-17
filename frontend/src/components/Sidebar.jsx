@@ -34,9 +34,9 @@ const Sidebar = () => {
   const menuItems = [
     { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, badge: null },
     { to: "/stocklist", label: "Liste des Stocks", icon: Package, badge: null },
-    { to: "/emprunt", label: "Emprunts", icon: Users, badge: "5" },
+    { to: "/emprunt", label: "Emprunts", icon: Users, badge: null },
     { to: "/edt", label: "Emploi du temps", icon: Calendar, badge: null },
-    { to: "/notif", label: "Notifications", icon: Bell, badge: "3" },
+   
     { to: "/listStudents", label: "Liste des Étudiants", icon: Users, badge: null },
     { to: "/settings", label: "Paramètres", icon: Settings, badge: null },
   ];

@@ -1,316 +1,166 @@
 import React, { useState, useEffect } from 'react';
-import Chart from 'react-apexcharts';
 import api from '../services/api'
 import { 
-  TrendingUp, 
-  TrendingDown, 
-  AlertCircle, 
   Package, 
   Users, 
+  Clock,
+  AlertTriangle,
   RefreshCw,
-  MoreVertical,
-  Download,
-  Filter,
-  Search,
-  Bell,
-  Settings,
-  AlertTriangle
+  CheckCircle,
+  Cpu,
+  Camera,
+  Server,
+  Wifi,
+  Cable,
+  Settings
 } from 'lucide-react';
 
 const Dashboard = () => {
   const [darkMode, setDarkMode] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [activeStat, setActiveStat] = useState(0);
-  const [totalStocks, setTotalStocks] = useState(null);
-  const [totalEmprunts, setTotalEmprunts] = useState(null);
-  const [retardEmprunts, setRetardEmprunts] = useState(null);
   const [loading, setLoading] = useState({
     stocks: true,
     emprunts: true,
-    retard: true
+    retard: true,
+    dernierEmprunts: true,
+    recentStocks: true,
+    alertes: true
   });
   const [errors, setErrors] = useState({
     stocks: null,
     emprunts: null,
-    retard: null
+    retard: null,
+    dernierEmprunts: null,
+    recentStocks: null,
+    alertes: null
   });
-  const [debugInfo, setDebugInfo] = useState([]);
-
-  const addDebugInfo = (message, data = null) => {
-    console.log(`🔍 DEBUG: ${message}`, data);
-    setDebugInfo(prev => [...prev.slice(-9), { 
-      timestamp: new Date().toLocaleTimeString(), 
-      message, 
-      data 
-    }]);
-  };
-
-  const [chartData, setChartData] = useState({
-    series: [{
-      name: 'Produits en stock',
-      data: [120, 140, 115, 160, 149, 180, 200, 220, 210, 230, 245, 260]
-    }],
-    options: {
-      chart: {
-        height: 350,
-        type: 'line',
-        zoom: { enabled: false },
-        toolbar: { show: true },
-        foreColor: darkMode ? '#CBD5E1' : '#64748B',
-        fontFamily: 'Inter, sans-serif',
-        animations: {
-          enabled: true,
-          easing: 'easeinout',
-          speed: 800,
-        }
-      },
-      dataLabels: { enabled: false },
-      stroke: { 
-        curve: 'smooth', 
-        width: 3,
-        lineCap: 'round'
-      },
-      colors: ['#10b981'],
-      grid: {
-        borderColor: darkMode ? '#334155' : '#E2E8F0',
-        row: { 
-          colors: [darkMode ? 'rgba(255,255,255,0.03)' : '#f8fafc', 'transparent'], 
-          opacity: 0.5 
-        },
-      },
-      xaxis: {
-        categories: ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sept', 'Oct', 'Nov', 'Déc'],
-        axisBorder: {
-          color: darkMode ? '#334155' : '#E2E8F0',
-        },
-        axisTicks: {
-          color: darkMode ? '#334155' : '#E2E8F0',
-        },
-      },
-      yaxis: {
-        min: 50,
-        max: 300,
-        labels: {
-          formatter: function(val) {
-            return Math.round(val);
-          }
-        }
-      },
-      title: {
-        text: 'Évolution des stocks disponibles',
-        align: 'left',
-        style: { 
-          fontSize: '18px', 
-          fontWeight: 'bold',
-          color: darkMode ? '#F1F5F9' : '#0F172A'
-        }
-      },
-      tooltip: {
-        theme: darkMode ? 'dark' : 'light',
-        x: {
-          show: true,
-          formatter: function(val) {
-            return `Mois: ${val}`;
-          }
-        }
-      },
-    },
+  const [data, setData] = useState({
+    totalStocks: 0,
+    totalEmprunts: 0,
+    retardEmprunts: 0,
+    dernierEmprunts: [],
+    recentStocks: [],
+    alertes: []
   });
 
-  const testApiConnection = async () => {
-    addDebugInfo('Test de connexion API démarré');
-    
-    try {
-      // Test de base de l'API
-      const testResponse = await api.get('/');
-      addDebugInfo('Test API racine', testResponse.data);
-      return true;
-    } catch (error) {
-      addDebugInfo('Erreur test API racine', error.response?.data || error.message);
-      return false;
-    }
+  // Fonction pour obtenir l'icône selon le type de matériel
+  const getMaterielIcon = (type) => {
+    const icons = {
+      PC: { icon: Cpu, color: "text-blue-600", bg: "bg-blue-100" },
+      Projecteur: { icon: Camera, color: "text-purple-600", bg: "bg-purple-100" },
+      Switch: { icon: Server, color: "text-green-600", bg: "bg-green-100" },
+      Adaptateur: { icon: Cable, color: "text-orange-600", bg: "bg-orange-100" },
+      Routeur: { icon: Wifi, color: "text-indigo-600", bg: "bg-indigo-100" },
+      Autre: { icon: Settings, color: "text-gray-600", bg: "bg-gray-100" }
+    };
+    return icons[type] || icons.Autre;
   };
 
-  const fetchTotals = async () => {
-    addDebugInfo('Début récupération des totaux');
-    setLoading({ stocks: true, emprunts: true, retard: true });
-    setErrors({ stocks: null, emprunts: null, retard: null });
+  // Fonction pour formater la date
+  const formatDate = (dateString) => {
+    if (!dateString) return 'N/A';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('fr-FR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    });
+  };
+
+  // Fonction pour calculer les jours de retard
+  const calculerJoursRetard = (dateRetour) => {
+    if (!dateRetour) return 0;
+    const dateRetourObj = new Date(dateRetour);
+    const aujourdHui = new Date();
+    const diffTime = aujourdHui - dateRetourObj;
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return Math.max(0, diffDays);
+  };
+
+  // Charger toutes les données
+  const fetchAllData = async () => {
+    setLoading({
+      stocks: true,
+      emprunts: true,
+      retard: true,
+      dernierEmprunts: true,
+      recentStocks: true,
+      alertes: true
+    });
 
     try {
-      // Test d'abord la connexion API
-      const apiConnected = await testApiConnection();
-      if (!apiConnected) {
-        throw new Error('API non accessible');
-      }
+      // Récupération des données en parallèle
+      const [
+        stocksRes,
+        empruntsRes,
+        retardRes,
+        empruntsListRes,
+        stocksListRes,
+        alertesRes
+      ] = await Promise.allSettled([
+        api.get('/stocks/count'),
+        api.get('/emprunts/count'),
+        api.get('/emprunts/retard'),
+        api.get('/emprunts?limit=3'),
+        api.get('/stocks?limit=3'),
+        api.get('/alertes/alertes-actives?limit=3')
+      ]);
 
-      // Récupération des données en parallèle avec gestion d'erreur individuelle
-      const promises = [
-        api.get('/stocks/count').catch(err => { 
-          setErrors(prev => ({ ...prev, stocks: err.response?.data?.message || 'Erreur stocks' }));
-          addDebugInfo('Erreur stocks/count', err.response?.data);
-          return null;
-        }),
-        api.get('/emprunts/count').catch(err => { 
-          setErrors(prev => ({ ...prev, emprunts: err.response?.data?.message || 'Erreur emprunts' }));
-          addDebugInfo('Erreur emprunts/count', err.response?.data);
-          return null;
-        }),
-        api.get('/emprunts/retard').catch(err => { 
-          setErrors(prev => ({ ...prev, retard: err.response?.data?.message || 'Erreur retard' }));
-          addDebugInfo('Erreur emprunts/retard', err.response?.data);
-          return null;
-        })
-      ];
+      // Traitement des résultats - limiter à 3 éléments maximum
+      setData(prev => ({
+        ...prev,
+        totalStocks: stocksRes.status === 'fulfilled' ? 
+          (stocksRes.value.data.count || stocksRes.value.data.total || 0) : 0,
+        totalEmprunts: empruntsRes.status === 'fulfilled' ? 
+          (empruntsRes.value.data.count || empruntsRes.value.data.total || 0) : 0,
+        retardEmprunts: retardRes.status === 'fulfilled' ? 
+          (retardRes.value.data.count || 0) : 0,
+        dernierEmprunts: empruntsListRes.status === 'fulfilled' ? 
+          (empruntsListRes.value.data.data || empruntsListRes.value.data || []).slice(0, 3) : [],
+        recentStocks: stocksListRes.status === 'fulfilled' ? 
+          (stocksListRes.value.data.data || stocksListRes.value.data || []).slice(0, 3) : [],
+        alertes: alertesRes.status === 'fulfilled' ? 
+          (alertesRes.value.data.data || alertesRes.value.data || []).slice(0, 3) : []
+      }));
 
-      const [stocksRes, empruntsRes, retardRes] = await Promise.all(promises);
-
-      addDebugInfo('Réponses API reçues', {
-        stocks: stocksRes?.data,
-        emprunts: empruntsRes?.data,
-        retard: retardRes?.data
+      // Gestion des erreurs
+      setErrors({
+        stocks: stocksRes.status === 'rejected' ? 'Erreur chargement stocks' : null,
+        emprunts: empruntsRes.status === 'rejected' ? 'Erreur chargement emprunts' : null,
+        retard: retardRes.status === 'rejected' ? 'Erreur chargement retards' : null,
+        dernierEmprunts: empruntsListRes.status === 'rejected' ? 'Erreur chargement derniers emprunts' : null,
+        recentStocks: stocksListRes.status === 'rejected' ? 'Erreur chargement stocks récents' : null,
+        alertes: alertesRes.status === 'rejected' ? 'Erreur chargement alertes' : null
       });
 
-      // Traitement des réponses avec fallback
-      if (stocksRes?.data) {
-        setTotalStocks(stocksRes.data.count || stocksRes.data.total || 0);
-      } else {
-        setTotalStocks(0);
-      }
-
-      if (empruntsRes?.data) {
-        setTotalEmprunts(empruntsRes.data.count || empruntsRes.data.total || 0);
-      } else {
-        setTotalEmprunts(0);
-      }
-
-      if (retardRes?.data) {
-        setRetardEmprunts(retardRes.data.count || 0);
-      } else {
-        setRetardEmprunts(0);
-      }
-
     } catch (error) {
-      console.error("Erreur générale récupération totaux:", error);
-      addDebugInfo('Erreur générale', error.message);
-      
-      // Valeurs par défaut en cas d'erreur générale
-      setTotalStocks(0);
-      setTotalEmprunts(0);
-      setRetardEmprunts(0);
+      console.error('Erreur générale:', error);
     } finally {
-      setLoading({ stocks: false, emprunts: false, retard: false });
-      addDebugInfo('Récupération terminée');
-    }
-  };
-
-  // Version alternative avec requêtes séquentielles pour debug
-  const fetchTotalsSequential = async () => {
-    addDebugInfo('Début récupération séquentielle');
-    setLoading({ stocks: true, emprunts: true, retard: true });
-    
-    try {
-      // Stocks
-      try {
-        addDebugInfo('Tentative stocks/count');
-        const stocksRes = await api.get('/stocks/count');
-        addDebugInfo('Stocks response', stocksRes.data);
-        setTotalStocks(stocksRes.data.count || stocksRes.data.total || 0);
-      } catch (error) {
-        addDebugInfo('Erreur stocks', error.response?.data);
-        setErrors(prev => ({ ...prev, stocks: error.response?.data?.message || 'Erreur stocks' }));
-        setTotalStocks(0);
-      }
-
-      // Emprunts
-      try {
-        addDebugInfo('Tentative emprunts/count');
-        const empruntsRes = await api.get('/emprunts/count');
-        addDebugInfo('Emprunts response', empruntsRes.data);
-        setTotalEmprunts(empruntsRes.data.count || empruntsRes.data.total || 0);
-      } catch (error) {
-        addDebugInfo('Erreur emprunts', error.response?.data);
-        setErrors(prev => ({ ...prev, emprunts: error.response?.data?.message || 'Erreur emprunts' }));
-        setTotalEmprunts(0);
-      }
-
-      // Retard
-      try {
-        addDebugInfo('Tentative emprunts/retard');
-        const retardRes = await api.get('/emprunts/retard');
-        addDebugInfo('Retard response', retardRes.data);
-        setRetardEmprunts(retardRes.data.count || 0);
-      } catch (error) {
-        addDebugInfo('Erreur retard', error.response?.data);
-        setErrors(prev => ({ ...prev, retard: error.response?.data?.message || 'Erreur retard' }));
-        setRetardEmprunts(0);
-      }
-
-    } finally {
-      setLoading({ stocks: false, emprunts: false, retard: false });
+      setLoading({
+        stocks: false,
+        emprunts: false,
+        retard: false,
+        dernierEmprunts: false,
+        recentStocks: false,
+        alertes: false
+      });
     }
   };
 
   useEffect(() => {
-    // Utiliser la version séquentielle pour mieux debugger
-    fetchTotalsSequential();
+    fetchAllData();
   }, []);
 
-  useEffect(() => {
-    setChartData(prevData => ({
-      ...prevData,
-      options: {
-        ...prevData.options,
-        chart: {
-          ...prevData.options.chart,
-          foreColor: darkMode ? '#CBD5E1' : '#64748B',
-        },
-        grid: {
-          ...prevData.options.grid,
-          borderColor: darkMode ? '#334155' : '#E2E8F0',
-          row: { 
-            colors: [darkMode ? 'rgba(255,255,255,0.03)' : '#f8fafc', 'transparent'], 
-            opacity: 0.5 
-          },
-        },
-        xaxis: {
-          ...prevData.options.xaxis,
-          axisBorder: {
-            color: darkMode ? '#334155' : '#E2E8F0',
-          },
-          axisTicks: {
-            color: darkMode ? '#334155' : '#E2E8F0',
-          },
-        },
-        title: {
-          ...prevData.options.title,
-          style: { 
-            fontSize: '18px', 
-            fontWeight: 'bold',
-            color: darkMode ? '#F1F5F9' : '#0F172A'
-          }
-        },
-        tooltip: {
-          ...prevData.options.tooltip,
-          theme: darkMode ? 'dark' : 'light',
-        },
-      }
-    }));
-  }, [darkMode]);
-
-  const handleRefresh = () => {
+  const handleRefresh = async () => {
     setIsRefreshing(true);
-    fetchTotalsSequential();
-    setTimeout(() => {
-      setIsRefreshing(false);
-    }, 1500);
+    await fetchAllData();
+    setTimeout(() => setIsRefreshing(false), 1000);
   };
 
   const stats = [
     {
       title: 'Produits en Stock',
-      value: loading.stocks ? '...' : (totalStocks != null ? totalStocks.toLocaleString() : '0'),
-      change: '+5%',
-      isPositive: true,
+      value: loading.stocks ? '...' : data.totalStocks.toLocaleString(),
       icon: <Package size={24} />,
       color: 'text-green-600',
       bgColor: 'bg-green-100',
@@ -318,27 +168,22 @@ const Dashboard = () => {
       error: errors.stocks
     },
     {
-      title: 'Retard des Emprunts',
-      value: loading.retard ? '...' : (retardEmprunts != null ? retardEmprunts.toLocaleString() : '0'),
-      change: '+2%',
-      isPositive: false,
-      icon: <AlertCircle size={24} />,
-      color: 'text-red-600',
-      bgColor: 'bg-red-100',
-      darkBgColor: 'bg-red-900/20',
-      description: 'emprunts en retard de retour',
-      error: errors.retard
-    },
-    {
       title: "Total d'Emprunts",
-      value: loading.emprunts ? '...' : (totalEmprunts != null ? totalEmprunts.toLocaleString() : '0'),
-      change: '+3',
-      isPositive: true,
+      value: loading.emprunts ? '...' : data.totalEmprunts.toLocaleString(),
       icon: <Users size={24} />,
       color: 'text-blue-600',
       bgColor: 'bg-blue-100',
       darkBgColor: 'bg-blue-900/20',
       error: errors.emprunts
+    },
+    {
+      title: 'Emprunts en Retard',
+      value: loading.retard ? '...' : data.retardEmprunts.toLocaleString(),
+      icon: <Clock size={24} />,
+      color: 'text-red-600',
+      bgColor: 'bg-red-100',
+      darkBgColor: 'bg-red-900/20',
+      error: errors.retard
     }
   ];
 
@@ -348,60 +193,36 @@ const Dashboard = () => {
       <header className="mb-8">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between">
           <div>
-            <h1 className="text-3xl font-bold">Dashboard Inventaire</h1>
+            <h1 className="text-3xl font-bold">Tableau de Bord Inventaire</h1>
             <p className={`mt-2 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-              Suivi en temps réel de vos stocks et emprunts.
+              Vue d'ensemble de votre gestion de stock et emprunts
             </p>
           </div>
-          <div className="flex items-center space-x-4 mt-4 md:mt-0">
-            <button 
+          <div className="flex items-center gap-4 mt-4 md:mt-0">
+            <button
               onClick={handleRefresh}
-              className={`p-2 rounded-lg flex items-center ${darkMode ? 'bg-gray-800 hover:bg-gray-700' : 'bg-white hover:bg-gray-100'} border ${darkMode ? 'border-gray-700' : 'border-gray-200'} shadow-sm ${isRefreshing ? 'animate-spin' : ''}`}
               disabled={isRefreshing}
+              className={`p-2 rounded-lg transition-all ${
+                darkMode ? 'bg-gray-800 hover:bg-gray-700' : 'bg-white hover:bg-gray-100'
+              } ${isRefreshing ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
-              <RefreshCw size={18} />
-            </button>
-            <button className={`p-2 rounded-lg ${darkMode ? 'bg-gray-800 hover:bg-gray-700' : 'bg-white hover:bg-gray-100'} border ${darkMode ? 'border-gray-700' : 'border-gray-200'} shadow-sm`}>
-              <Bell size={18} />
-            </button>
-            <button className={`p-2 rounded-lg ${darkMode ? 'bg-gray-800 hover:bg-gray-700' : 'bg-white hover:bg-gray-100'} border ${darkMode ? 'border-gray-700' : 'border-gray-200'} shadow-sm`}>
-              <Settings size={18} />
+              <RefreshCw size={20} className={isRefreshing ? 'animate-spin' : ''} />
             </button>
           </div>
-        </div>
-        
-        {/* Barre de recherche et actions */}
-        <div className={`mt-6 flex flex-wrap items-center gap-3 p-4 rounded-xl ${darkMode ? 'bg-gray-800' : 'bg-white'} shadow-md`}>
-          <div className="relative flex-1 min-w-[200px]">
-            <Search size={18} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-            <input 
-              type="text" 
-              placeholder="Rechercher un produit ou emprunt..." 
-              className={`w-full pl-10 pr-4 py-2 rounded-lg border ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-gray-50 border-gray-200 text-gray-900'} focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
-            />
-          </div>
-          <button className={`flex items-center gap-2 px-4 py-2 rounded-lg border ${darkMode ? 'bg-gray-700 border-gray-600 hover:bg-gray-600' : 'bg-white border-gray-200 hover:bg-gray-50'} shadow-sm`}>
-            <Filter size={16} />
-            <span>Filtrer</span>
-          </button>
-          <button className={`flex items-center gap-2 px-4 py-2 rounded-lg border ${darkMode ? 'bg-gray-700 border-gray-600 hover:bg-gray-600' : 'bg-white border-gray-200 hover:bg-gray-50'} shadow-sm`}>
-            <Download size={16} />
-            <span>Exporter</span>
-          </button>
         </div>
       </header>
 
       {/* Messages d'erreur */}
-      {(errors.stocks || errors.emprunts || errors.retard) && (
+      {Object.values(errors).some(error => error) && (
         <div className={`mb-6 p-4 rounded-lg border ${darkMode ? 'bg-red-900/20 border-red-800' : 'bg-red-50 border-red-200'}`}>
           <div className="flex items-center gap-2 text-red-600 mb-2">
             <AlertTriangle size={20} />
-            <span className="font-semibold">Erreurs de connexion</span>
+            <span className="font-semibold">Erreurs de chargement</span>
           </div>
           <div className="text-sm space-y-1">
-            {errors.stocks && <div>• Stocks: {errors.stocks}</div>}
-            {errors.emprunts && <div>• Emprunts: {errors.emprunts}</div>}
-            {errors.retard && <div>• Retard: {errors.retard}</div>}
+            {Object.entries(errors).map(([key, error]) => 
+              error && <div key={key}>• {error}</div>
+            )}
           </div>
         </div>
       )}
@@ -411,12 +232,9 @@ const Dashboard = () => {
         {stats.map((stat, index) => (
           <div 
             key={index}
-            className={`p-6 rounded-xl shadow-lg transition-all duration-300 transform hover:scale-105 cursor-pointer ${
+            className={`p-6 rounded-xl shadow-lg transition-all duration-300 ${
               darkMode ? 'bg-gray-800' : 'bg-white'
-            } ${activeStat === index ? 'ring-2 ring-blue-500' : ''} ${
-              stat.error ? 'border border-red-300' : ''
-            }`}
-            onClick={() => setActiveStat(index)}
+            } ${stat.error ? 'border border-red-300' : ''}`}
           >
             <div className="flex justify-between items-start">
               <div className="flex-1">
@@ -428,28 +246,11 @@ const Dashboard = () => {
                     <AlertTriangle size={16} className="text-red-500" />
                   )}
                 </div>
-                <p className={`mt-2 text-3xl font-bold ${stat.color}`}>
+                <p className={`text-3xl font-bold ${stat.color}`}>
                   {stat.value}
                 </p>
-                <div className={`mt-2 flex items-center text-sm ${stat.isPositive ? 'text-green-500' : 'text-red-500'}`}>
-                  {stat.isPositive ? <TrendingUp size={16} /> : <TrendingDown size={16} />}
-                  <span className="ml-1">{stat.change}</span>
-                  <span className="ml-1">{stat.isPositive ? 'vs mois dernier' : 'de plus que prévu'}</span>
-                </div>
-                {stat.description && (
-                  <p className={`mt-1 text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                    {stat.description}
-                  </p>
-                )}
-                {stat.error && (
-                  <p className={`mt-2 text-xs ${darkMode ? 'text-red-400' : 'text-red-600'}`}>
-                    {stat.error}
-                  </p>
-                )}
               </div>
-              <div className={`p-3 rounded-full ${darkMode ? stat.darkBgColor : stat.bgColor} ${
-                stat.error ? 'opacity-50' : ''
-              }`}>
+              <div className={`p-3 rounded-lg ${darkMode ? stat.darkBgColor : stat.bgColor}`}>
                 {stat.icon}
               </div>
             </div>
@@ -457,53 +258,258 @@ const Dashboard = () => {
         ))}
       </section>
 
-      {/* Graphique des tendances */}
-      <section className={`p-6 rounded-xl shadow-lg mb-8 ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-xl font-semibold">Tendance des Stocks</h2>
-          <div className="flex items-center space-x-2">
-            <button className={`px-3 py-1 rounded-lg text-sm ${darkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-100 hover:bg-gray-200'}`}>
-              Mensuel
-            </button>
-            <button className={`px-3 py-1 rounded-lg text-sm ${darkMode ? 'bg-blue-600 hover:bg-blue-500' : 'bg-blue-100 text-blue-700 hover:bg-blue-200'}`}>
-              Trimestriel
-            </button>
-            <button className={`px-3 py-1 rounded-lg text-sm ${darkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-100 hover:bg-gray-200'}`}>
-              Annuel
-            </button>
-            <button className={`p-2 rounded-lg ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}>
-              <MoreVertical size={16} />
-            </button>
+      {/* Grille des listes */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+        
+        {/* Derniers emprunts */}
+        <section className={`p-6 rounded-xl shadow-lg ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-xl font-semibold flex items-center gap-2">
+              <Users size={20} />
+              Derniers Emprunts
+            </h2>
+            <span className={`text-sm px-2 py-1 rounded-full ${
+              darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-600'
+            }`}>
+              {loading.dernierEmprunts ? '...' : data.dernierEmprunts.length}/3
+            </span>
           </div>
-        </div>
-        <div className="h-80">
-          <Chart
-            options={chartData.options}
-            series={chartData.series}
-            type="line"
-            height="100%"
-          />
-        </div>
-      </section>
-
-      {/* Panel de debug (visible seulement en développement) */}
-      {process.env.NODE_ENV === 'development' && (
-        <details className={`mt-8 p-4 rounded-lg ${darkMode ? 'bg-gray-800' : 'bg-gray-100'}`}>
-          <summary className="cursor-pointer font-mono text-sm">Debug Info</summary>
-          <div className="mt-2 font-mono text-xs max-h-40 overflow-y-auto">
-            {debugInfo.map((info, index) => (
-              <div key={index} className="border-b border-gray-300 py-1">
-                <span className="text-gray-500">[{info.timestamp}]</span> {info.message}
-                {info.data && (
-                  <pre className="mt-1 whitespace-pre-wrap">
-                    {JSON.stringify(info.data, null, 2)}
-                  </pre>
-                )}
+          
+          <div className="space-y-4">
+            {loading.dernierEmprunts ? (
+              <div className="text-center py-8">
+                <RefreshCw size={24} className="animate-spin mx-auto mb-2" />
+                <p className="text-sm text-gray-500">Chargement...</p>
               </div>
-            ))}
+            ) : data.dernierEmprunts.length === 0 ? (
+              <div className="text-center py-8">
+                <Users size={48} className="mx-auto mb-2 text-gray-400" />
+                <p className="text-gray-500">Aucun emprunt récent</p>
+              </div>
+            ) : (
+              data.dernierEmprunts.map((emprunt) => {
+                const IconComponent = getMaterielIcon(emprunt.materiel?.type).icon;
+                const joursRetard = calculerJoursRetard(emprunt.dateRetour);
+                const estEnRetard = joursRetard > 0 && !emprunt.heureEntree;
+
+                return (
+                  <div 
+                    key={emprunt._id}
+                    className={`p-4 rounded-lg border transition-all ${
+                      darkMode ? 'bg-gray-700/50 border-gray-600' : 'bg-gray-50 border-gray-200'
+                    } ${estEnRetard ? 'border-red-300 bg-red-50' : ''}`}
+                  >
+                    <div className="flex items-start justify-between mb-2">
+                      <div className="flex items-center gap-3">
+                        <div className={`p-2 rounded-lg ${
+                          darkMode ? 'bg-gray-600' : 'bg-white'
+                        }`}>
+                          <IconComponent size={16} className={
+                            estEnRetard ? 'text-red-500' : 'text-blue-500'
+                          } />
+                        </div>
+                        <div>
+                          <h3 className="font-semibold text-sm">
+                            {emprunt.materiel?.name || 'Matériel inconnu'}
+                          </h3>
+                          <p className="text-xs text-gray-500">
+                            {emprunt.prenoms} • {emprunt.matricule}
+                          </p>
+                        </div>
+                      </div>
+                      {estEnRetard && (
+                        <span className="text-xs bg-red-100 text-red-600 px-2 py-1 rounded-full">
+                          +{joursRetard}j
+                        </span>
+                      )}
+                    </div>
+                    
+                    <div className="flex justify-between items-center text-xs text-gray-500">
+                      <span>Sorti: {formatDate(emprunt.dateEmprunt)}</span>
+                      <div className="flex items-center gap-1">
+                        {emprunt.heureEntree ? (
+                          <CheckCircle size={12} className="text-green-500" />
+                        ) : (
+                          <Clock size={12} className="text-amber-500" />
+                        )}
+                        <span>{emprunt.heureEntree ? 'Rendu' : 'En cours'}</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            )}
           </div>
-        </details>
-      )}
+        </section>
+
+        {/* Matériels récemment ajoutés */}
+        <section className={`p-6 rounded-xl shadow-lg ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-xl font-semibold flex items-center gap-2">
+              <Package size={20} />
+              Matériels Récents
+            </h2>
+            <span className={`text-sm px-2 py-1 rounded-full ${
+              darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-600'
+            }`}>
+              {loading.recentStocks ? '...' : data.recentStocks.length}/3
+            </span>
+          </div>
+          
+          <div className="space-y-4">
+            {loading.recentStocks ? (
+              <div className="text-center py-8">
+                <RefreshCw size={24} className="animate-spin mx-auto mb-2" />
+                <p className="text-sm text-gray-500">Chargement...</p>
+              </div>
+            ) : data.recentStocks.length === 0 ? (
+              <div className="text-center py-8">
+                <Package size={48} className="mx-auto mb-2 text-gray-400" />
+                <p className="text-gray-500">Aucun matériel récent</p>
+              </div>
+            ) : (
+              data.recentStocks.map((stock) => {
+                const IconComponent = getMaterielIcon(stock.type).icon;
+                const statutStock = stock.stock === 0 ? 
+                  { text: 'Rupture', color: 'text-red-600', bg: 'bg-red-100' } :
+                  stock.stock <= stock.threshold ? 
+                  { text: 'Stock faible', color: 'text-amber-600', bg: 'bg-amber-100' } :
+                  { text: 'En stock', color: 'text-green-600', bg: 'bg-green-100' };
+
+                return (
+                  <div 
+                    key={stock._id}
+                    className={`p-4 rounded-lg border transition-all ${
+                      darkMode ? 'bg-gray-700/50 border-gray-600' : 'bg-gray-50 border-gray-200'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex items-center gap-3">
+                        <div className={`p-2 rounded-lg ${
+                          darkMode ? getMaterielIcon(stock.type).bg.replace('bg-', 'bg-').replace('100', '900/20') : 
+                          getMaterielIcon(stock.type).bg
+                        }`}>
+                          <IconComponent size={16} className={
+                            darkMode ? getMaterielIcon(stock.type).color.replace('text-', 'text-').replace('600', '300') : 
+                            getMaterielIcon(stock.type).color
+                          } />
+                        </div>
+                        <div>
+                          <h3 className="font-semibold text-sm">{stock.name}</h3>
+                          <p className="text-xs text-gray-500">{stock.type}</p>
+                        </div>
+                      </div>
+                      <span className={`text-xs px-2 py-1 rounded-full ${
+                        darkMode ? 
+                        statutStock.bg.replace('bg-', 'bg-').replace('100', '900/20') + ' ' + statutStock.color.replace('text-', 'text-').replace('600', '300') :
+                        statutStock.bg + ' ' + statutStock.color
+                      }`}>
+                        {statutStock.text}
+                      </span>
+                    </div>
+                    
+                    <div className="flex justify-between items-center">
+                      <div className="text-sm">
+                        <span className="font-semibold">{stock.stock}</span>
+                        <span className="text-gray-500"> unités</span>
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        Seuil: {stock.threshold}
+                      </div>
+                    </div>
+
+                    {stock.specifications && Object.keys(stock.specifications).length > 0 && (
+                      <div className="mt-2 text-xs text-gray-500">
+                        {Object.entries(stock.specifications).slice(0, 2).map(([key]) => (
+                          <span key={key} className="mr-2">• {key}</span>
+                        ))}
+                        {Object.keys(stock.specifications).length > 2 && (
+                          <span>+{Object.keys(stock.specifications).length - 2}</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </section>
+
+        {/* Alertes des emprunts */}
+        <section className={`p-6 rounded-xl shadow-lg ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-xl font-semibold flex items-center gap-2">
+              <AlertTriangle size={20} />
+              Alertes Actives
+            </h2>
+            <span className={`text-sm px-2 py-1 rounded-full ${
+              darkMode ? 'bg-red-900/20 text-red-300' : 'bg-red-100 text-red-600'
+            }`}>
+              {loading.alertes ? '...' : data.alertes.length}/3
+            </span>
+          </div>
+          
+          <div className="space-y-4">
+            {loading.alertes ? (
+              <div className="text-center py-8">
+                <RefreshCw size={24} className="animate-spin mx-auto mb-2" />
+                <p className="text-sm text-gray-500">Chargement...</p>
+              </div>
+            ) : data.alertes.length === 0 ? (
+              <div className="text-center py-8">
+                <CheckCircle size={48} className="mx-auto mb-2 text-green-400" />
+                <p className="text-gray-500">Aucune alerte active</p>
+                <p className="text-sm text-gray-400 mt-1">Tout est sous contrôle</p>
+              </div>
+            ) : (
+              data.alertes.map((alerte) => {
+                const joursRetard = calculerJoursRetard(alerte.dateRetourPrevue);
+                
+                return (
+                  <div 
+                    key={alerte._id}
+                    className="p-4 rounded-lg border border-red-200 bg-red-50 transition-all"
+                  >
+                    <div className="flex items-start justify-between mb-2">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 rounded-lg bg-red-100">
+                          <AlertTriangle size={16} className="text-red-600" />
+                        </div>
+                        <div>
+                          <h3 className="font-semibold text-sm text-red-800">
+                            Retard de retour
+                          </h3>
+                          <p className="text-xs text-red-600">
+                            {alerte.empruntId?.prenoms} • {alerte.empruntId?.matricule}
+                          </p>
+                        </div>
+                      </div>
+                      <span className="text-xs bg-red-600 text-white px-2 py-1 rounded-full">
+                        +{joursRetard}j
+                      </span>
+                    </div>
+                    
+                    <div className="text-xs text-red-700 space-y-1">
+                      <div className="flex justify-between">
+                        <span>Matériel:</span>
+                        <span className="font-medium">{alerte.empruntId?.materiel?.name}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Date de retour prévue:</span>
+                        <span>{formatDate(alerte.dateRetourPrevue)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Dépassement:</span>
+                        <span>{joursRetard} jour(s)</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </section>
+      </div>
     </div>
   );
 };
