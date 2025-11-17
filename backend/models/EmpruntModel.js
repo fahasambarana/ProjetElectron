@@ -11,6 +11,7 @@ const empruntSchema = new mongoose.Schema(
     parcours: { type: String, required: true },
     heureSortie: { type: String, required: true },
     heureEntree: { type: String },
+    type:{type: String},
     materiel: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Stock",
